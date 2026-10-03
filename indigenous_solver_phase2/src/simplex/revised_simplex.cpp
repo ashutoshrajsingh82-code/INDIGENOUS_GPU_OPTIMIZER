@@ -73,9 +73,14 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
   for(Index i=0;i<M;++i){basis[i]=n+i;x[n+i]=b[i];}
 
   SparseLU lu;
+  auto column=[&](Index j, Index i)->Real {
+    return j<n ? A[i][j] : (j-n==i ? 1.0 : 0.0);
+  };
   auto refactor=[&](){
     std::vector<std::vector<Real>> B(M,std::vector<Real>(M,0));
-    for(Index k=0;k<M;++k) B[k][k]=1;
+    for(Index k=0;k<M;++k)
+      for(Index i=0;i<M;++i)
+        B[i][k]=column(basis[k],i);
     return lu.factorize(B,options_.pivot_tolerance);
   };
   if(!refactor()) return {SolveStatus::NumericalFailure,0,{}, {},0,0,0,"Initial basis factorization failed."};
@@ -98,7 +103,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       if(basic) continue;
       Real rc=c[j];
       for(Index i=0;i<M;++i){
-        Real a=(j<n)?A[i][j]:(j-n==i?1.0:0.0);
+        Real a=column(j,i);
         rc-=pi[i]*a;
       }
       Real score=rc/std::sqrt(options_.use_devex?std::max<Real>(1,1.0):1.0);
@@ -107,7 +112,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
     if(enter<0) break;
 
     std::vector<Real> col(M,0);
-    for(Index i=0;i<M;++i) col[i]=(enter<n)?A[i][enter]:(enter-n==i?1.0:0.0);
+    for(Index i=0;i<M;++i) col[i]=column(enter,i);
     if(!lu.solve(col,direction))
       return {SolveStatus::NumericalFailure,0,{}, {},0,0,iter,"FTRAN failed for entering column."};
 

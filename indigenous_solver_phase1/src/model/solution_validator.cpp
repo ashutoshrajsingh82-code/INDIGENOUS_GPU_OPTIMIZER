@@ -1,0 +1,6 @@
+#include "solver/model/solution_validator.hpp"
+#include <cmath>
+#include <algorithm>
+namespace solver {
+ValidationReport validate_solution(const LinearModel&m,const std::vector<Real>&x,Real reported){ValidationReport r;if(x.size()!=m.variables.size()){r.message="primal vector dimension mismatch";return r;}for(size_t j=0;j<x.size();++j){if(std::isnan(x[j])||std::isinf(x[j])){r.message="non-finite primal value";return r;}if(x[j]<m.variables[j].lower_bound)r.max_primal_violation=std::max(r.max_primal_violation,m.variables[j].lower_bound-x[j]);if(x[j]>m.variables[j].upper_bound)r.max_primal_violation=std::max(r.max_primal_violation,x[j]-m.variables[j].upper_bound);}std::vector<Real> ax;m.A.multiply(x,ax);for(size_t i=0;i<ax.size();++i){if(ax[i]<m.constraints[i].lower_bound)r.max_primal_violation=std::max(r.max_primal_violation,m.constraints[i].lower_bound-ax[i]);if(ax[i]>m.constraints[i].upper_bound)r.max_primal_violation=std::max(r.max_primal_violation,ax[i]-m.constraints[i].upper_bound);}r.recomputed_objective=m.objective_value(x);r.objective_difference=std::abs(r.recomputed_objective-reported);r.valid=r.max_primal_violation<=1e-8; r.message=r.valid?"solution satisfies primal feasibility":"primal feasibility violation";return r;}
+}

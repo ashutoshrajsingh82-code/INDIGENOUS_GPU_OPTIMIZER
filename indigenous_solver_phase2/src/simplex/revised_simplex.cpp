@@ -14,6 +14,7 @@
 namespace solver {
 namespace {
 constexpr Real kEqTol=1e-10;
+constexpr std::size_t kMaxEtaUpdates=32;
 static bool phase2_debug_enabled() {
 #ifdef _WIN32
   char* value=nullptr;
@@ -389,8 +390,21 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       x[sys.basis[leave]]=0;
       sys.basis[leave]=enter;
       ++stats.pivots;
+
+      // Keep the existing LU factors and represent this column replacement
+      // as a product-form eta update. Full refactorization is deferred until
+      // the eta chain reaches a bounded length, preventing one expensive
+      // sparse factorization per simplex pivot.
+      const auto lu_update_start=std::chrono::steady_clock::now();
+      if(!lu.update(direction,leave,options_.pivot_tolerance))
+        return SolveStatus::NumericalFailure;
+      stats.lu_update_ms+=elapsed_ms(lu_update_start);
+      ++stats.lu_updates;
+
+      if(lu.update_count()>=kMaxEtaUpdates){
+        if(!refactor()) return SolveStatus::NumericalFailure;
+      }
       stats.basis_update_ms+=elapsed_ms(basis_update_start);
-      if(!refactor()) return SolveStatus::NumericalFailure;
     }
     return SolveStatus::IterationLimit;
   };

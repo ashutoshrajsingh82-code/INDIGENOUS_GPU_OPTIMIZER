@@ -150,12 +150,10 @@ bool SparseLU::factorize_sparse_columns(
   l_.resize(n_);
   perm_.resize(n_);
 
-  // Populate U directly from the sparse basis columns and build a transient
-  // over-approximate column incidence index for affected-row discovery.
+  // Populate U directly from the sparse basis columns. Unlike the dense
+  // factorize() path, this avoids scanning every zero in the basis matrix.
   const auto load_start=std::chrono::steady_clock::now();
-  std::vector<std::vector<Index>> column_rows(n_);
   for(Index j=0;j<n_;++j) {
-    column_rows[j].reserve(columns[j].size());
     for(const auto& [i,value] : columns[j]) {
       if(i>=n_) {
         n_=0;
@@ -163,13 +161,10 @@ bool SparseLU::factorize_sparse_columns(
       }
       if(std::abs(value)>drop_tol) {
         u_[i][j]=value;
-        column_rows[j].push_back(i);
       }
     }
   }
   for(Index i=0;i<n_;++i) perm_[i]=i;
-  std::vector<Index> seen_stamp(n_,0);
-  Index stamp=0;
   last_factor_load_ms_=std::chrono::duration<double,std::milli>(
       std::chrono::steady_clock::now()-load_start).count();
 
@@ -197,8 +192,6 @@ bool SparseLU::factorize_sparse_columns(
         std::chrono::steady_clock::now()-pivot_start).count();
 
     if(pivot!=k) {
-      for(const auto& [j,value] : u_[pivot]) column_rows[j].push_back(k);
-      for(const auto& [j,value] : u_[k]) column_rows[j].push_back(pivot);
       std::swap(u_[pivot],u_[k]);
       std::swap(l_[pivot],l_[k]);
       std::swap(perm_[pivot],perm_[k]);
@@ -236,10 +229,8 @@ bool SparseLU::factorize_sparse_columns(
         ++last_factor_elimination_hash_finds_;
         if(existing==u_[i].end()) {
           const Real updated=-multiplier*value;
-          if(std::abs(updated)>drop_tol) {
+          if(std::abs(updated)>drop_tol)
             u_[i][j]=updated;
-            column_rows[j].push_back(i);
-          }
         } else {
           const Real updated=existing->second-multiplier*value;
           if(std::abs(updated)<=drop_tol)

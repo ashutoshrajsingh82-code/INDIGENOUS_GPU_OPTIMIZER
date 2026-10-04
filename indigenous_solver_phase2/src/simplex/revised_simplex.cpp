@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <string>
@@ -32,6 +33,12 @@ static bool nearly_equal(Real a, Real b, Real tol) {
 }
 
 SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
+  const auto solve_start=std::chrono::steady_clock::now();
+  SimplexStatistics stats;
+  auto elapsed_ms=[](auto start){
+    return std::chrono::duration<double,std::milli>(
+      std::chrono::steady_clock::now()-start).count();
+  };
   std::string err;
   if(!input.validate(err)) return {SolveStatus::InvalidModel,0,{}, {},0,0,0,err};
 
@@ -171,11 +178,17 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
   SparseLU lu;
   auto column=[&](Index j, Index i)->Real { return sys.A[i][j]; };
   auto refactor=[&](){
+    const auto start=std::chrono::steady_clock::now();
     std::vector<std::vector<Real>> B(M,std::vector<Real>(M,0));
     for(Index k=0;k<M;++k)
       for(Index i=0;i<M;++i)
         B[i][k]=column(sys.basis[k],i);
-    return lu.factorize(B,options_.pivot_tolerance);
+    const bool ok=lu.factorize(B,options_.pivot_tolerance);
+    stats.lu_factorization_ms+=elapsed_ms(start);
+    ++stats.lu_factorizations;
+    stats.max_lu_nonzeros=std::max(
+      stats.max_lu_nonzeros,lu.l_nonzeros()+lu.u_nonzeros());
+    return ok;
   };
 
   if(!refactor())
@@ -196,7 +209,12 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
         ++phase_iterations,++iterations){
       std::vector<Real> cb(M,0);
       for(Index i=0;i<M;++i) cb[i]=c[sys.basis[i]];
-      if(!lu.solve_transpose(cb,pi)) return SolveStatus::NumericalFailure;
+      {
+        const auto start=std::chrono::steady_clock::now();
+        if(!lu.solve_transpose(cb,pi)) return SolveStatus::NumericalFailure;
+        stats.btran_ms+=elapsed_ms(start);
+        ++stats.btran_solves;
+      }
       if(!phase_one && std::getenv("PHASE2_DEBUG") && phase_iterations<3){
         Real dual_res=0;
         for(Index k=0;k<M;++k){
@@ -208,6 +226,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
                  <<" dual_residual="<<dual_res<<"\\n";
       }
 
+      const auto pricing_start=std::chrono::steady_clock::now();
       Index enter=-1; Real best=options_.dual_tolerance;
       Real max_rc=-std::numeric_limits<Real>::infinity();
       Index max_rc_j=-1;
@@ -229,6 +248,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
         const Real score=rc/std::sqrt(weight);
         if(score>best){best=score;enter=j;}
       }
+      stats.pricing_ms+=elapsed_ms(pricing_start);
       if(!phase_one && phase_iterations==0 && std::getenv("PHASE2_DEBUG")){
         std::cerr<<"[PHASE2_DEBUG] rows="<<M
                  <<" cols="<<total
@@ -258,7 +278,12 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
 
       std::vector<Real> col(M,0);
       for(Index i=0;i<M;++i) col[i]=column(enter,i);
-      if(!lu.solve(col,direction)) return SolveStatus::NumericalFailure;
+      {
+        const auto start=std::chrono::steady_clock::now();
+        if(!lu.solve(col,direction)) return SolveStatus::NumericalFailure;
+        stats.ftran_ms+=elapsed_ms(start);
+        ++stats.ftran_solves;
+      }
       if(!phase_one && std::getenv("PHASE2_DEBUG") && phase_iterations<3){
         Real ftran_res=0;
         for(Index i=0;i<M;++i){
@@ -270,6 +295,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
                  <<" ftran_residual="<<ftran_res<<"\\n";
       }
 
+      const auto pivot_start=std::chrono::steady_clock::now();
       Real theta=std::numeric_limits<Real>::infinity();
       for(Index i=0;i<M;++i) if(direction[i]>options_.pivot_tolerance){
         const Real t=x[sys.basis[i]]/direction[i];
@@ -344,6 +370,8 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       x[enter]=theta;
       x[sys.basis[leave]]=0;
       sys.basis[leave]=enter;
+      ++stats.pivots;
+      stats.pivot_ms+=elapsed_ms(pivot_start);
       if(!refactor()) return SolveStatus::NumericalFailure;
     }
     return SolveStatus::IterationLimit;
@@ -490,7 +518,9 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
              <<" max_abs_original="<<max_original
              <<" residual="<<pres<<"\\n";
   }
+  stats.total_ms=elapsed_ms(solve_start);
   return {SolveStatus::Optimal,objective,primal,{},pres,0,iterations,
-          "Phase I feasible basis constructed; Phase II revised simplex optimal solution found."};
+          "Phase I feasible basis constructed; Phase II revised simplex optimal solution found.",
+          stats};
 }
 }

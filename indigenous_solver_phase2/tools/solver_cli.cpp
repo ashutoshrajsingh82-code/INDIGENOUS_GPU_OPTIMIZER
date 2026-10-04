@@ -6,10 +6,7 @@
 #include "solver/simplex/revised_simplex.hpp"
 #include "solver/model/solution_validator.hpp"
 using namespace solver;
-static bool load(const std::string& f,LinearModel& m,std::string& e){
-  auto p=f.find_last_of('.');auto ext=p==std::string::npos?"":f.substr(p+1);
-  if(ext=="mps"||ext=="MPS")return read_mps(f,m,e); return read_lp(f,m,e);
-}
+static bool load(const std::string& f,LinearModel& m,std::string& e){auto p=f.find_last_of('.');auto ext=p==std::string::npos?"":f.substr(p+1);if(ext=="mps"||ext=="MPS")return read_mps(f,m,e); return read_lp(f,m,e);}
 int main(int argc,char**argv){
   if(argc<3){std::cerr<<"Usage: solver_phase2_cli solve <model.lp|model.mps> [--max-iters N]\n";return 2;}
   LinearModel m;std::string e;if(!load(argv[2],m,e)){std::cerr<<"ERROR: "<<e<<"\n";return 1;}
@@ -22,6 +19,7 @@ int main(int argc,char**argv){
   const auto& s=r.statistics;
   std::cout<<"Timing total_ms: "<<std::setprecision(6)<<s.total_ms<<"\n"
            <<"Timing LU_factorization_ms: "<<s.lu_factorization_ms<<"\n"
+           <<"Timing LU_update_ms: "<<s.lu_update_ms<<"\n"
            <<"Timing BTRAN_ms: "<<s.btran_ms<<"\n"
            <<"Timing FTRAN_ms: "<<s.ftran_ms<<"\n"
            <<"Timing pricing_ms: "<<s.pricing_ms<<"\n"
@@ -29,6 +27,7 @@ int main(int argc,char**argv){
            <<"Timing ratio_test_ms: "<<s.ratio_test_ms<<"\n"
            <<"Timing basis_update_ms: "<<s.basis_update_ms<<"\n"
            <<"LU factorizations: "<<s.lu_factorizations<<"\n"
+           <<"LU updates: "<<s.lu_updates<<"\n"
            <<"BTRAN solves: "<<s.btran_solves<<"\n"
            <<"FTRAN solves: "<<s.ftran_solves<<"\n"
            <<"Pivots: "<<s.pivots<<"\n"

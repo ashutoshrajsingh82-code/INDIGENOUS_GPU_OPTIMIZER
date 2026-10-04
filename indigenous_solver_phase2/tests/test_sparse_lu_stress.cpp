@@ -122,6 +122,66 @@ int main() {
     }
   }
 
+  // Sparse tridiagonal systems with deterministic permutations exercise
+  // fill-in handling while keeping the reference solution well-conditioned.
+  for(Index n=4;n<=40;n+=4) {
+    std::vector<std::vector<Real>> a(n,std::vector<Real>(n,0));
+    for(Index i=0;i<n;++i) {
+      a[i][i]=4.0;
+      if(i>0) a[i][i-1]=-1.0;
+      if(i+1<n) a[i][i+1]=-1.0;
+    }
+
+    std::vector<Index> permutation(n);
+    std::iota(permutation.begin(),permutation.end(),0);
+    std::rotate(permutation.begin(),permutation.begin()+1,permutation.end());
+
+    std::vector<std::vector<Real>> permuted(n,std::vector<Real>(n,0));
+    for(Index i=0;i<n;++i) permuted[i]=a[permutation[i]];
+
+    std::vector<Real> expected(n);
+    for(Index i=0;i<n;++i) expected[i]=1.0+0.01*static_cast<Real>(i);
+    const auto b=multiply(permuted,expected);
+
+    SparseLU lu;
+    std::vector<Real> x;
+    check(lu.factorize(permuted),"sparse tridiagonal factorization");
+    check(lu.solve(b,x),"sparse tridiagonal solve");
+    check(max_residual(permuted,x,b)<1e-10,
+          "sparse tridiagonal residual");
+    ++cases;
+  }
+
+  // A repeated row is singular and must be rejected rather than producing
+  // a non-finite solution.
+  {
+    SparseLU lu;
+    const std::vector<std::vector<Real>> singular{
+      {2,1,0},
+      {2,1,0},
+      {0,1,2}
+    };
+    check(!lu.factorize(singular),"singular matrix rejection");
+  }
+
+  // A small but meaningful pivot exercises the relative pivot acceptance
+  // path without requiring a numerically singular matrix.
+  {
+    SparseLU lu;
+    const std::vector<std::vector<Real>> a{
+      {1e-8,1.0,0.0},
+      {1.0,1.0,1.0},
+      {0.0,1.0,2.0}
+    };
+    const std::vector<Real> expected{1.0,-2.0,3.0};
+    const auto b=multiply(a,expected);
+    std::vector<Real> x;
+    check(lu.factorize(a,1e-12),"small pivot factorization");
+    check(lu.solve(b,x),"small pivot solve");
+    check(max_residual(a,x,b)<1e-9,"small pivot residual");
+    ++cases;
+  }
+
   std::cout << "SparseLU stress cases: " << cases << "\n";
   std::cout << (fails ? "SPARSE LU STRESS TESTS FAILED"
                        : "SPARSE LU STRESS TESTS PASSED") << "\n";

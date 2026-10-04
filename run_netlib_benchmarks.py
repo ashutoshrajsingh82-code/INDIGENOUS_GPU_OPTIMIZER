@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import os
 import re
 import shutil
@@ -20,7 +21,7 @@ DEFAULT_HIGHS_CANDIDATES = [
     ROOT.parent / "HiGHS" / "build" / "Release" / "bin" / "highs.exe",
     ROOT.parent.parent / "HiGHS" / "build" / "Release" / "bin" / "highs.exe",
 ]
-NETLIB_BASE = "https://www.netlib.org/lp/data/"
+NETLIB_BASE = "https://raw.githubusercontent.com/coin-or-tools/Data-Netlib/master/"
 
 OBJECTIVE_RE = re.compile(
     r"^Objective:\s*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*$",
@@ -79,25 +80,44 @@ def model_names() -> list[str]:
     ]
 
 
+def is_mps_file(path: Path) -> bool:
+    """Return True when a file starts like a plain-text MPS model."""
+    if not path.is_file() or path.stat().st_size == 0:
+        return False
+    try:
+        with path.open("r", encoding="ascii", errors="ignore") as handle:
+            header = handle.read(4096)
+    except OSError:
+        return False
+    return "NAME" in header and "ROWS" in header and "COLUMNS" in header
+
+
 def ensure_models(names: list[str]) -> list[Path]:
     NETLIB_DIR.mkdir(parents=True, exist_ok=True)
     models: list[Path] = []
     for name in names:
         destination = NETLIB_DIR / (name + ".mps")
-        if destination.is_file() and destination.stat().st_size > 0:
+        if is_mps_file(destination):
             models.append(destination)
             continue
 
-        url = NETLIB_BASE + name
+        compressed = NETLIB_DIR / (name + ".mps.gz")
+        url = NETLIB_BASE + name.lower() + ".mps.gz"
         print(f"[DOWNLOAD] {name} <- {url}")
         try:
-            urllib.request.urlretrieve(url, destination)
-            if destination.is_file() and destination.stat().st_size > 0:
+            urllib.request.urlretrieve(url, compressed)
+            with gzip.open(compressed, "rb") as source, destination.open("wb") as target:
+                shutil.copyfileobj(source, target)
+            compressed.unlink()
+            if is_mps_file(destination):
                 models.append(destination)
+            else:
+                raise ValueError("downloaded file is not plain-text MPS")
         except Exception as exc:
-            print(f"[FAIL] {name}: download failed: {exc}")
-            if destination.exists():
-                destination.unlink()
+            print(f"[FAIL] {name}: download/conversion failed: {exc}")
+            for path in (compressed, destination):
+                if path.exists():
+                    path.unlink()
     return models
 
 
@@ -152,8 +172,7 @@ def main() -> int:
             failures += 1
             continue
 
-        # Netlib classic LP files commonly have no extension, but the solver
-        # CLI determines the format from file content/path support.
+        # The harness materializes the compressed Netlib distribution as plain MPS.
         solver_code, solver_out = run_command(
             [str(solver), "solve", str(model), "--max-iters", "100000"]
         )

@@ -52,6 +52,9 @@ public:
 
 private:
   using Row = std::unordered_map<Index, Real>;
+  using SparseEntry = std::pair<Index, Real>;
+
+  void rebuild_solve_cache();
 
   struct EtaUpdate {
     Index pivot_row=0;
@@ -77,6 +80,12 @@ private:
   // After factorization: P*A = L*U.
   std::vector<Row> l_;
   std::vector<Row> u_;
+
+  // Immutable contiguous copies used by FTRAN/BTRAN between refactorizations.
+  // Factorization and eta updates continue to use the hash-map rows above.
+  std::vector<std::vector<SparseEntry>> l_solve_rows_;
+  std::vector<std::vector<SparseEntry>> u_solve_rows_;
+  std::vector<Real> u_diagonal_;
 
   // perm_[k] is the original row now stored at factorized row k.
   std::vector<Index> perm_;

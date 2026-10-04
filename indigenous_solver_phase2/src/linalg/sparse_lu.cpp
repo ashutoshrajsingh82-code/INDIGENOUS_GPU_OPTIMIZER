@@ -345,9 +345,11 @@ bool SparseLU::solve_transpose(const std::vector<Real>& b,
     }
   }
 
-  // Undo the row permutation.
-  std::vector<Real> permuted=x;
-  for(Index i=0;i<n_;++i) x[perm_[i]]=permuted[i];
+  // Undo the row permutation using a reusable workspace. This preserves
+  // the exact permutation semantics while avoiding a full vector allocation
+  // on every BTRAN call.
+  transpose_workspace_=x;
+  for(Index i=0;i<n_;++i) x[perm_[i]]=transpose_workspace_[i];
   return true;
 }
 

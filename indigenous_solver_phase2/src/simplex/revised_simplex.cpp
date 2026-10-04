@@ -283,6 +283,13 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       }
 
       theta=std::max<Real>(0,x[sys.basis[leave]]/direction[leave]);
+      if(!phase_one && std::getenv("PHASE2_DEBUG") && theta>options_.primal_tolerance){
+        std::cerr<<"[PHASE2_MOVE] iter="<<phase_iterations
+                 <<" enter="<<enter
+                 <<" leave="<<sys.basis[leave]
+                 <<" theta="<<theta
+                 <<" reduced_cost="<<max_rc<<"\\n";
+      }
       for(Index i=0;i<M;++i) if(i!=leave)
         x[sys.basis[i]]-=theta*direction[i];
 
@@ -382,6 +389,18 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
   }
 
   const Real objective=model.objective_value(primal);
+  if(std::getenv("PHASE2_DEBUG")){
+    Index positive_original=0;
+    Real max_original=0;
+    for(Index j=0;j<n;++j){
+      if(primal[j]>options_.primal_tolerance) ++positive_original;
+      max_original=std::max(max_original,std::abs(primal[j]));
+    }
+    std::cerr<<"[PHASE2_SOLUTION] objective="<<objective
+             <<" positive_original="<<positive_original
+             <<" max_abs_original="<<max_original
+             <<" residual="<<pres<<"\\n";
+  }
   return {SolveStatus::Optimal,objective,primal,{},pres,0,iterations,
           "Phase I feasible basis constructed; Phase II revised simplex optimal solution found."};
 }

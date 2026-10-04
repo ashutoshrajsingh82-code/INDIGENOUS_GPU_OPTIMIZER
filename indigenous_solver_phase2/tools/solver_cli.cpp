@@ -23,6 +23,7 @@ int main(int argc,char**argv){
            <<"Timing LU_factor_pivot_ms: "<<s.lu_factor_pivot_ms<<"\n"
            <<"Timing LU_factor_elimination_ms: "<<s.lu_factor_elimination_ms<<"\n"
            <<"LU elimination affected rows: "<<s.lu_factor_elimination_affected_rows<<"\n"
+           <<"LU elimination row scan checks: "<<s.lu_factor_elimination_row_scan_checks<<"\n"
            <<"LU elimination pivot entries: "<<s.lu_factor_elimination_pivot_entries<<"\n"
            <<"LU elimination hash finds: "<<s.lu_factor_elimination_hash_finds<<"\n"
            <<"LU elimination hash inserts: "<<s.lu_factor_elimination_hash_inserts<<"\n"

@@ -10,6 +10,7 @@ check_language(CUDA)
 
 if(CMAKE_CUDA_COMPILER)
   enable_language(CUDA)
+
   add_library(indigenous_gpu_backend
     src/gpu/vector_ops.cu
   )
@@ -19,18 +20,19 @@ if(CMAKE_CUDA_COMPILER)
     CUDA_STANDARD_REQUIRED ON
     CUDA_EXTENSIONS OFF
   )
-
-  add_executable(indigenous_gpu_smoke_test tests/gpu_smoke_test.cu)
-  target_link_libraries(indigenous_gpu_smoke_test PRIVATE indigenous_gpu_backend)
-  set_target_properties(indigenous_gpu_smoke_test PROPERTIES
-    CUDA_STANDARD 17
-    CUDA_STANDARD_REQUIRED ON
-    CUDA_EXTENSIONS OFF
-  )
-
-  enable_testing()
-  add_test(NAME indigenous_gpu_smoke_test COMMAND indigenous_gpu_smoke_test)
-  message(STATUS "Phase 3 CUDA backend: ENABLED")
+  message(STATUS "Phase 3 backend: CUDA enabled")
 else()
-  message(STATUS "Phase 3 CUDA backend: DISABLED (CUDA compiler not found)")
+  add_library(indigenous_gpu_backend
+    src/gpu/vector_ops_cpu.cpp
+  )
+  target_include_directories(indigenous_gpu_backend PUBLIC include)
+  message(STATUS "Phase 3 backend: CUDA unavailable, using CPU fallback")
 endif()
+
+add_executable(indigenous_gpu_smoke_test
+  tests/gpu_smoke_test.cpp
+)
+target_link_libraries(indigenous_gpu_smoke_test PRIVATE indigenous_gpu_backend)
+
+enable_testing()
+add_test(NAME indigenous_gpu_smoke_test COMMAND indigenous_gpu_smoke_test)

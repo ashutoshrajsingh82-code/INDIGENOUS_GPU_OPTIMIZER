@@ -33,8 +33,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
   }
   for(Index i=0;i<m;++i){
     const auto& r=model.constraints[i];
-    if(std::isfinite(r.lower_bound) &&
-       (std::abs(r.lower_bound-r.upper_bound)>kEqTol || !std::isfinite(r.upper_bound)))
+    if(std::isfinite(r.lower_bound))
       return {SolveStatus::UnsupportedModel,0,{}, {},0,0,0,
               "Phase 2 revised simplex currently requires <= constraints; equality/>= rows are reserved for the artificial-variable gate."};
   }

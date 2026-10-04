@@ -36,5 +36,11 @@ add_executable(indigenous_gpu_smoke_test
 )
 target_link_libraries(indigenous_gpu_smoke_test PRIVATE indigenous_gpu_backend)
 
+add_executable(indigenous_sparse_pricing_test
+  tests/sparse_pricing_test.cpp
+)
+target_link_libraries(indigenous_sparse_pricing_test PRIVATE indigenous_gpu_backend)
+
 enable_testing()
 add_test(NAME indigenous_gpu_smoke_test COMMAND indigenous_gpu_smoke_test)
+add_test(NAME indigenous_sparse_pricing_test COMMAND indigenous_sparse_pricing_test)

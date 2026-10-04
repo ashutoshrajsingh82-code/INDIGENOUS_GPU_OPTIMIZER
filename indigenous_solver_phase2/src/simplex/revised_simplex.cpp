@@ -504,7 +504,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
     bool nonnegative=true;
     for(Index i=0;i<M;++i){
       const Index basic=sys.basis[i];
-      candidate[basic]+=correction[i];
+      candidate[static_cast<std::size_t>(basic)]+=correction[i];
       if(candidate[basic] < -options_.primal_tolerance){
         nonnegative=false;
         break;
@@ -540,6 +540,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
              <<" max_abs_original="<<max_original
              <<" residual="<<pres<<"\\n";
   }
+  stats.pivot_ms=stats.ratio_test_ms+stats.basis_update_ms;
   stats.total_ms=elapsed_ms(solve_start);
   return {SolveStatus::Optimal,objective,primal,{},pres,0,iterations,
           "Phase I feasible basis constructed; Phase II revised simplex optimal solution found.",

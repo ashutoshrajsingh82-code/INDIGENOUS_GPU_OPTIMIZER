@@ -29,5 +29,10 @@ target_link_libraries(solver_phase2_cli PRIVATE solver_phase2)
 
 add_executable(solver_phase2_tests tests/test_phase2.cpp)
 target_link_libraries(solver_phase2_tests PRIVATE solver_phase2)
+
+add_executable(solver_phase2_random_lp_tests tests/test_random_lp.cpp)
+target_link_libraries(solver_phase2_random_lp_tests PRIVATE solver_phase2)
+
 enable_testing()
 add_test(NAME solver_phase2_tests COMMAND solver_phase2_tests)
+add_test(NAME solver_phase2_random_lp_tests COMMAND solver_phase2_random_lp_tests)

@@ -2,6 +2,8 @@
 #include <cmath>
 #include <limits>
 #include <string>
+#include <cstdlib>
+#include <iostream>
 #include <vector>
 #include "solver/simplex/revised_simplex.hpp"
 #include "solver/linalg/sparse_lu.hpp"

@@ -61,7 +61,7 @@ int main(){
   {
     const char* path="phase2_mps_duplicate_test.mps";
     std::ofstream out(path);
-    out << "NAME DUP\\nROWS\\n N OBJ\\n L C1\\nCOLUMNS\\n X OBJ -1 C1 1\\n X C1 2\\nRHS\\n RHS1 C1 3\\nBOUNDS\\nENDATA\\n";
+    out << "NAME DUP\nROWS\n N OBJ\n L C1\nCOLUMNS\n X OBJ -1 C1 1\n X C1 2\nRHS\n RHS1 C1 3\nBOUNDS\nENDATA\n";
     out.close();
     LinearModel parsed; std::string parse_error;
     check(read_mps(path,parsed,parse_error),"MPS duplicate-entry parse");

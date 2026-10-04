@@ -34,6 +34,21 @@ int main(){
   auto v=validate_solution(m,r.primal,r.objective_value);
   check(v.valid,"certificate");
 
+  // Devex and unit-weight pricing must agree on the LP optimum.
+  RevisedSimplexOptions no_devex;
+  no_devex.use_devex=false;
+  auto plain=RevisedSimplexSolver{no_devex}.solve(m);
+  check(plain.status==SolveStatus::Optimal,"unit-weight pricing optimal");
+  check(std::abs(plain.objective_value-r.objective_value)<1e-7,
+        "Devex objective agreement");
+
+  RevisedSimplexOptions devex;
+  devex.use_devex=true;
+  auto weighted=RevisedSimplexSolver{devex}.solve(m);
+  check(weighted.status==SolveStatus::Optimal,"Devex pricing optimal");
+  check(std::abs(weighted.objective_value-r.objective_value)<1e-7,
+        "Devex objective agreement");
+
   LinearModel eq=m; eq.constraints={{"eq",2,2}};
   auto er=RevisedSimplexSolver{}.solve(eq);
   check(er.status==SolveStatus::UnsupportedModel,"equality gate");

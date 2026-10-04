@@ -210,6 +210,9 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
     const bool ok=lu.factorize_sparse_columns(
         basis_columns,M,options_.pivot_tolerance);
     stats.lu_factorization_ms+=elapsed_ms(start);
+    stats.lu_factor_load_ms+=lu.last_factor_load_ms();
+    stats.lu_factor_pivot_ms+=lu.last_factor_pivot_ms();
+    stats.lu_factor_elimination_ms+=lu.last_factor_elimination_ms();
     ++stats.lu_factorizations;
     stats.max_lu_nonzeros=std::max(
       stats.max_lu_nonzeros,lu.l_nonzeros()+lu.u_nonzeros());

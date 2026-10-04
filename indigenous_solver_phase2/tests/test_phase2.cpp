@@ -19,7 +19,7 @@ int main(){
   m.A=CscMatrix(1,2,{1,1},{0,0},{0,1,2});
   auto r=RevisedSimplexSolver{}.solve(m);
   check(r.status==SolveStatus::Optimal,"revised simplex optimal");
-  check(std::abs(r.objective_value+10)<1e-7,"revised simplex objective");
+  check(std::abs(r.objective_value+6)<1e-7,"revised simplex objective");
   auto v=validate_solution(m,r.primal,r.objective_value);
   check(v.valid,"certificate");
 

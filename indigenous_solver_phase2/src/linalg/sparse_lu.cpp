@@ -84,9 +84,16 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
     min_pivot_=std::min(min_pivot_,std::abs(pivot_value));
 
     // Only rows with a nonzero in the pivot column require elimination.
+    // Build a transient affected-row list from the current sparse row maps.
+    // The existing hash lookup below remains the final correctness check.
+    std::vector<Index> affected_rows;
+    for(Index i=k+1;i<n_;++i) {
+      if(u_[i].find(k)!=u_[i].end())
+        affected_rows.push_back(i);
+    }
     last_factor_elimination_row_scan_checks_ +=
         static_cast<std::size_t>(n_ - k - 1);
-    for(Index i=k+1;i<n_;++i) {
+    for(const Index i:affected_rows) {
       auto col_it=u_[i].find(k);
       if(col_it==u_[i].end()) continue;
 

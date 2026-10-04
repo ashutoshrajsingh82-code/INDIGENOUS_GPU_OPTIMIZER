@@ -14,7 +14,7 @@
 namespace solver {
 namespace {
 constexpr Real kEqTol=1e-10;
-constexpr std::size_t kMaxEtaUpdates=64;
+constexpr std::size_t kMaxEtaUpdates=32;
 static bool phase2_debug_enabled() {
 #ifdef _WIN32
   char* value=nullptr;

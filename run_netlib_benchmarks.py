@@ -10,6 +10,8 @@ import re
 import shutil
 import subprocess
 import sys
+import time
+import csv
 import urllib.request
 from pathlib import Path
 
@@ -133,6 +135,12 @@ def main() -> int:
         help="Relative objective tolerance used with --tolerance.",
     )
     parser.add_argument(
+        "--csv",
+        type=Path,
+        default=None,
+        help="Write per-model timing/statistics to a CSV file.",
+    )
+    parser.add_argument(
         "--download",
         action="store_true",
         help="Download missing models listed in benchmarks/netlib/manifest.txt.",
@@ -175,6 +183,7 @@ def main() -> int:
 
     failures = 0
     executed = 0
+    rows: list[dict[str, str]] = []
 
     for model in models:
         if not model.is_file():
@@ -182,10 +191,15 @@ def main() -> int:
             failures += 1
             continue
 
+        solver_start = time.perf_counter()
         solver_code, solver_out = run_command(
             [str(solver), "solve", str(model), "--max-iters", "100000"]
         )
+        solver_ms = (time.perf_counter() - solver_start) * 1000.0
+
+        highs_start = time.perf_counter()
         highs_code, highs_out = run_command([str(highs), str(model)])
+        highs_ms = (time.perf_counter() - highs_start) * 1000.0
 
         solver_status = extract(STATUS_RE, solver_out) or "UNKNOWN"
         solver_obj = extract(OBJECTIVE_RE, solver_out)
@@ -236,11 +250,32 @@ def main() -> int:
             f"limit={comparison_limit_text} "
             f"iterations={iterations} "
             f"highs_iterations={highs_iterations} "
+            f"solver_ms={solver_ms:.3f} "
+            f"highs_ms={highs_ms:.3f} "
             f"certificate={certificate} "
             f"solver_rc={solver_code} "
             f"highs_rc={highs_code} "
             f"failed_checks={failed_checks}"
         )
+
+        rows.append({
+            "model": model.stem,
+            "status": "PASS" if ok else "FAIL",
+            "solver_status": solver_status,
+            "highs_status": highs_status,
+            "solver_objective": solver_obj or "",
+            "highs_objective": highs_obj or "",
+            "objective_difference": f"{difference:.12g}" if difference != float("inf") else "",
+            "objective_limit": f"{comparison_limit:.12g}",
+            "solver_iterations": iterations,
+            "highs_iterations": highs_iterations,
+            "solver_ms": f"{solver_ms:.3f}",
+            "highs_ms": f"{highs_ms:.3f}",
+            "certificate": certificate,
+            "solver_rc": str(solver_code),
+            "highs_rc": str(highs_code),
+            "failed_checks": failed_checks,
+        })
 
         executed += 1
         if not ok:
@@ -255,6 +290,52 @@ def main() -> int:
     print(f"Models:    {executed}")
     print(f"Passed:    {executed - failures}")
     print(f"Failed:    {failures}")
+
+    if rows:
+        solver_times = [float(row["solver_ms"]) for row in rows]
+        highs_times = [float(row["highs_ms"]) for row in rows]
+        solver_iters = [int(row["solver_iterations"]) for row in rows if row["solver_iterations"].isdigit()]
+        highs_iters = [int(row["highs_iterations"]) for row in rows if row["highs_iterations"].isdigit()]
+        print(
+            "Solver timing (ms): "
+            f"total={sum(solver_times):.3f} "
+            f"avg={sum(solver_times)/len(solver_times):.3f} "
+            f"min={min(solver_times):.3f} "
+            f"max={max(solver_times):.3f}"
+        )
+        print(
+            "HiGHS timing (ms):  "
+            f"total={sum(highs_times):.3f} "
+            f"avg={sum(highs_times)/len(highs_times):.3f} "
+            f"min={min(highs_times):.3f} "
+            f"max={max(highs_times):.3f}"
+        )
+        if solver_iters:
+            print(
+                "Solver iterations:  "
+                f"total={sum(solver_iters)} "
+                f"avg={sum(solver_iters)/len(solver_iters):.1f} "
+                f"min={min(solver_iters)} "
+                f"max={max(solver_iters)}"
+            )
+        if highs_iters:
+            print(
+                "HiGHS iterations:   "
+                f"total={sum(highs_iters)} "
+                f"avg={sum(highs_iters)/len(highs_iters):.1f} "
+                f"min={min(highs_iters)} "
+                f"max={max(highs_iters)}"
+            )
+
+    if args.csv and rows:
+        args.csv.parent.mkdir(parents=True, exist_ok=True)
+        fieldnames = list(rows[0].keys())
+        with args.csv.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+        print(f"CSV:       {args.csv}")
+
     return 1 if failures else 0
 
 if __name__ == "__main__":

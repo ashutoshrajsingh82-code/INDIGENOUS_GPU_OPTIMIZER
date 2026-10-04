@@ -26,6 +26,8 @@ int main(int argc,char**argv){
            <<"Timing FTRAN_ms: "<<s.ftran_ms<<"\n"
            <<"Timing pricing_ms: "<<s.pricing_ms<<"\n"
            <<"Timing pivot_ms: "<<s.pivot_ms<<"\n"
+           <<"Timing ratio_test_ms: "<<s.ratio_test_ms<<"\n"
+           <<"Timing basis_update_ms: "<<s.basis_update_ms<<"\n"
            <<"LU factorizations: "<<s.lu_factorizations<<"\n"
            <<"BTRAN solves: "<<s.btran_solves<<"\n"
            <<"FTRAN solves: "<<s.ftran_solves<<"\n"

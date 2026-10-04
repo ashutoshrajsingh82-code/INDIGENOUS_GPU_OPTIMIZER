@@ -377,15 +377,21 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
                  <<" theta="<<theta
                  <<" reduced_cost="<<max_rc<<"\\n";
       }
-      for(Index i=0;i<M;++i) if(i!=leave)
-        x[sys.basis[i]]-=theta*direction[i];
-
-      if(options_.use_devex){
-        Real new_weight=1.0;
-        for(Index i=0;i<M;++i){
-          const Real w=std::max<Real>(1.0,devex_weight[sys.basis[i]]);
+      // Update the primal basic values and, when enabled, the entering
+      // variable's Devex weight in one row pass. Both operations consume
+      // the same basis/direction data, so combining them avoids a second
+      // full scan of the basis on every pivot.
+      Real new_weight=1.0;
+      for(Index i=0;i<M;++i){
+        const Index basic=sys.basis[i];
+        if(i!=leave) x[basic]-=theta*direction[i];
+        if(options_.use_devex){
+          const Real w=std::max<Real>(1.0,devex_weight[basic]);
           new_weight+=w*direction[i]*direction[i];
         }
+      }
+
+      if(options_.use_devex){
         devex_weight[enter]=std::max<Real>(1.0,new_weight);
         if(devex_weight[enter]>1e12)
           for(Real& w:devex_weight) w=1.0;

@@ -191,20 +191,35 @@ bool SparseLU::factorize_sparse_columns(
     const Real pivot_value=diag_it->second;
     min_pivot_=std::min(min_pivot_,std::abs(pivot_value));
     const auto elimination_start=std::chrono::steady_clock::now();
+
+    // Snapshot the active pivot row once. Reusing this compact traversal
+    // avoids repeatedly walking the hash table's iterator machinery for
+    // every affected row.
+    std::vector<std::pair<Index,Real>> pivot_entries;
+    pivot_entries.reserve(u_[k].size());
+    for(const auto& [j,value] : u_[k])
+      if(j>k) pivot_entries.push_back({j,value});
+
     for(Index i=k+1;i<n_;++i) {
       auto col_it=u_[i].find(k);
       if(col_it==u_[i].end()) continue;
       const Real multiplier=col_it->second/pivot_value;
       u_[i].erase(col_it);
       if(std::abs(multiplier)>drop_tol) l_[i][k]=multiplier;
-      for(const auto& [j, value] : u_[k]) {
-        if(j<=k) continue;
-        const Real updated=u_[i].count(j)?u_[i][j]-multiplier*value
-                                        :-multiplier*value;
-        if(std::abs(updated)<=drop_tol)
-          u_[i].erase(j);
-        else
-          u_[i][j]=updated;
+
+      for(const auto& [j,value] : pivot_entries) {
+        auto existing=u_[i].find(j);
+        if(existing==u_[i].end()) {
+          const Real updated=-multiplier*value;
+          if(std::abs(updated)>drop_tol)
+            u_[i][j]=updated;
+        } else {
+          const Real updated=existing->second-multiplier*value;
+          if(std::abs(updated)<=drop_tol)
+            u_[i].erase(existing);
+          else
+            existing->second=updated;
+        }
       }
     }
     last_factor_elimination_ms_+=std::chrono::duration<double,std::milli>(

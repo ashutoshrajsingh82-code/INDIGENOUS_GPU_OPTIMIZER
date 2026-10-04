@@ -147,11 +147,6 @@ bool SparseLU::factorize_sparse_columns(
   l_.resize(n_);
   perm_.resize(n_);
 
-  // Maintain a transient column-incidence index alongside U. This lets the
-  // elimination kernel visit only rows that actually contain the active
-  // pivot column instead of scanning every remaining row.
-  std::vector<std::vector<Index>> column_rows(n_);
-
   // Populate U directly from the sparse basis columns. Unlike the dense
   // factorize() path, this avoids scanning every zero in the basis matrix.
   const auto load_start=std::chrono::steady_clock::now();
@@ -163,7 +158,6 @@ bool SparseLU::factorize_sparse_columns(
       }
       if(std::abs(value)>drop_tol) {
         u_[i][j]=value;
-        column_rows[j].push_back(i);
       }
     }
   }
@@ -217,19 +211,13 @@ bool SparseLU::factorize_sparse_columns(
     for(const auto& [j,value] : u_[k])
       if(j>k) pivot_entries.push_back({j,value});
 
-    // The incidence list is built in row order during loading. Rows whose
-    // pivot-column entry was already eliminated are skipped by a lower-bound
-    // scan, so no full n-row traversal is needed.
-    for(const Index i : column_rows[k]) {
-      if(i<=k) continue;
+    for(Index i=k+1;i<n_;++i) {
       auto col_it=u_[i].find(k);
       ++last_factor_elimination_hash_finds_;
       if(col_it==u_[i].end()) continue;
       ++last_factor_elimination_affected_rows_;
       const Real multiplier=col_it->second/pivot_value;
       u_[i].erase(col_it);
-
-      auto& pivot_rows=column_rows[k];
       if(std::abs(multiplier)>drop_tol) l_[i][k]=multiplier;
 
       for(const auto& [j,value] : pivot_entries) {
@@ -238,22 +226,14 @@ bool SparseLU::factorize_sparse_columns(
         ++last_factor_elimination_hash_finds_;
         if(existing==u_[i].end()) {
           const Real updated=-multiplier*value;
-          if(std::abs(updated)>drop_tol) {
+          if(std::abs(updated)>drop_tol)
             u_[i][j]=updated;
-            column_rows[j].push_back(i);
-            ++last_factor_elimination_hash_inserts_;
-          }
         } else {
           const Real updated=existing->second-multiplier*value;
-          if(std::abs(updated)<=drop_tol) {
+          if(std::abs(updated)<=drop_tol)
             u_[i].erase(existing);
-            auto& rows=column_rows[j];
-            auto pos=std::find(rows.begin(),rows.end(),i);
-            if(pos!=rows.end()) rows.erase(pos);
-            ++last_factor_elimination_hash_erases_;
-          } else {
+          else
             existing->second=updated;
-          }
         }
       }
     }

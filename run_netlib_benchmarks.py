@@ -31,12 +31,11 @@ HIGHS_OBJECTIVE_RE = re.compile(
     r"Objective value\s*:\s*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)"
 )
 ITERATIONS_RE = re.compile(r"^Iterations:\s*(\d+)\s*$", re.MULTILINE)
-# When stdout/stderr are merged on Windows, the stream boundary can leave a
-# carriage return or other horizontal whitespace immediately before Status.
-STATUS_RE = re.compile(r"^[\r\t ]*Status:\s*(\S+)", re.MULTILINE)
+STATUS_RE = re.compile(r"Status:\s*(\S+)")
 CERTIFICATE_RE = re.compile(r"^Certificate:\s*(\S+)\s*$", re.MULTILINE)
 HIGHS_ITERATIONS_RE = re.compile(r"Simplex\s+iterations:\s*(\d+)")
 HIGHS_STATUS_RE = re.compile(r"Model status\s*:\s*(\S+)")
+ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 def find_highs() -> Path | None:
     env_highs = os.environ.get("HIGHS_EXE")
@@ -65,7 +64,8 @@ def run_command(command: list[str]) -> tuple[int, str]:
     return result.returncode, result.stdout
 
 def extract(pattern: re.Pattern[str], text: str) -> str | None:
-    match = pattern.search(text)
+    normalized = ANSI_RE.sub("", text).replace("\x00", "")
+    match = pattern.search(normalized)
     return match.group(1) if match else None
 
 def model_names() -> list[str]:

@@ -149,13 +149,14 @@ bool SparseLU::solve(const std::vector<Real>& b,
     x[ii]=rhs/diag->second;
   }
 
-  // B_current = B_base * E_1 * ... * E_k. Apply the eta transforms in
-  // chronological order to obtain E_k^{-1}...E_1^{-1} U^{-1}L^{-1}P b.
+  // B_current = B_base * E_1 * ... * E_k. For an eta matrix E whose
+  // replacement column is d, E*x=y gives x[r]=y[r]/d[r] and
+  // x[i]=y[i]-d[i]*x[r]. Apply E_1^{-1}, then E_2^{-1}, ... in order.
   for(const auto& eta:etas_) {
-    Real sum=0;
+    const Real pivot_component=x[eta.pivot_row]/eta.pivot;
     for(Index i=0;i<n_;++i) if(i!=eta.pivot_row)
-      sum+=eta.direction[i]*x[i];
-    x[eta.pivot_row]=(x[eta.pivot_row]-sum)/eta.pivot;
+      x[i]-=eta.direction[i]*pivot_component;
+    x[eta.pivot_row]=pivot_component;
   }
   return true;
 }

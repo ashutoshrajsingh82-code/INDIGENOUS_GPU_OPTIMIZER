@@ -218,16 +218,21 @@ def main() -> int:
             difference_text = "n/a"
             comparison_limit_text = "n/a"
 
-        ok = (
-            solver_code == 0
-            and highs_code == 0
-            and solver_status == "OPTIMAL"
-            and highs_status == "Optimal"
-            and solver_obj is not None
-            and highs_obj is not None
-            and difference <= comparison_limit
-            and certificate == "PASS"
-        )
+        checks = {
+            "solver_rc": solver_code == 0,
+            "highs_rc": highs_code == 0,
+            "solver_status": solver_status == "OPTIMAL",
+            "highs_status": highs_status == "Optimal",
+            "solver_objective": solver_obj is not None,
+            "highs_objective": highs_obj is not None,
+            "objective_tolerance": difference <= comparison_limit,
+            "certificate": certificate == "PASS",
+        }
+        ok = all(checks.values())
+
+        failed_checks = ",".join(
+            name for name, passed in checks.items() if not passed
+        ) or "-"
 
         print(
             f"[{'PASS' if ok else 'FAIL'}] {model.name}: "
@@ -239,7 +244,8 @@ def main() -> int:
             f"highs_iterations={highs_iterations} "
             f"certificate={certificate} "
             f"solver_rc={solver_code} "
-            f"highs_rc={highs_code}"
+            f"highs_rc={highs_code} "
+            f"failed_checks={failed_checks}"
         )
 
         executed += 1

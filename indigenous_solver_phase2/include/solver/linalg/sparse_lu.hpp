@@ -1,5 +1,6 @@
 #pragma once
 #include <unordered_map>
+#include <utility>
 #include <vector>
 #include "solver/common/types.hpp"
 
@@ -15,6 +16,12 @@ class SparseLU {
 public:
   bool factorize(const std::vector<std::vector<Real>>& a,
                  Real pivot_tolerance=1e-12);
+
+  // Factorize directly from sparse column storage. This avoids materializing
+  // a dense basis matrix during simplex refactorization.
+  bool factorize_sparse_columns(
+      const std::vector<std::vector<std::pair<Index, Real>>>& columns,
+      Index dimension, Real pivot_tolerance=1e-12);
 
   bool solve(const std::vector<Real>& b, std::vector<Real>& x) const;
   bool solve_transpose(const std::vector<Real>& b,

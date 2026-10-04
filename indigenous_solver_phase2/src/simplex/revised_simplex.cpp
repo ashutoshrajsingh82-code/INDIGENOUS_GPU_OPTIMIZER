@@ -348,6 +348,22 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
   Real artificial_sum=0;
   for(Index j=0;j<total;++j) if(sys.artificial[j])
     artificial_sum+=std::max<Real>(0,x[j]);
+
+  if(std::getenv("PHASE2_DEBUG")){
+    Real max_rhs=0, max_basic=0;
+    Index positive_basic=0;
+    for(Index i=0;i<M;++i){
+      max_rhs=std::max(max_rhs,std::abs(sys.b[i]));
+      const Real xb=x[sys.basis[i]];
+      max_basic=std::max(max_basic,std::abs(xb));
+      if(xb>options_.primal_tolerance) ++positive_basic;
+    }
+    std::cerr<<"[PHASE2_P1] iterations="<<phase1_iters
+             <<" artificial_sum="<<artificial_sum
+             <<" max_rhs="<<max_rhs
+             <<" max_basic="<<max_basic
+             <<" positive_basic="<<positive_basic<<"\\n";
+  }
   if(artificial_sum>options_.primal_tolerance*std::max<Real>(1.0,M)){
     return {SolveStatus::Infeasible,0,{}, {},artificial_sum,0,iterations,
             "Phase I optimum is positive; model is infeasible."};

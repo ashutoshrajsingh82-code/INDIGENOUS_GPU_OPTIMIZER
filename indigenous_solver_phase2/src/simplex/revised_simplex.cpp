@@ -4,6 +4,7 @@
 #include <limits>
 #include <string>
 #include <cstdlib>
+#include <optional>
 #include <iostream>
 #include <vector>
 #include "solver/simplex/revised_simplex.hpp"
@@ -13,6 +14,11 @@
 namespace solver {
 namespace {
 constexpr Real kEqTol=1e-10;
+const bool kPhase2Debug = []{
+  const char* value=kPhase2Debug;
+  return value && value[0] && value[0]!='0';
+}();
+
 
 struct StandardRow {
   std::vector<Real> a;
@@ -215,7 +221,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
         stats.btran_ms+=elapsed_ms(start);
         ++stats.btran_solves;
       }
-      if(!phase_one && std::getenv("PHASE2_DEBUG") && phase_iterations<3){
+      if(!phase_one && kPhase2Debug && phase_iterations<3){
         Real dual_res=0;
         for(Index k=0;k<M;++k){
           Real lhs=0;
@@ -249,7 +255,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
         if(score>best){best=score;enter=j;}
       }
       stats.pricing_ms+=elapsed_ms(pricing_start);
-      if(!phase_one && phase_iterations==0 && std::getenv("PHASE2_DEBUG")){
+      if(!phase_one && phase_iterations==0 && kPhase2Debug){
         std::cerr<<"[PHASE2_DEBUG] rows="<<M
                  <<" cols="<<total
                  <<" artificial_basic="<<artificial_basic_count
@@ -260,7 +266,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
                  <<" basis_first="<<(M?sys.basis[0]:Index(-1))
                  <<" x_selected="<<((enter>=0)?x[enter]:0)<<"\\n";
       }
-      if(!phase_one && std::getenv("PHASE2_DEBUG") && phase_iterations<10){
+      if(!phase_one && kPhase2Debug && phase_iterations<10){
         std::cerr<<"[PHASE2_PIVOT] iter="<<phase_iterations
                  <<" enter="<<enter
                  <<" reduced_cost="<<((enter>=0)?max_rc:0)
@@ -268,7 +274,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
                  <<" x_enter="<<((enter>=0)?x[enter]:0)<<"\\n";
       }
       if(enter<0){
-        if(!phase_one && std::getenv("PHASE2_DEBUG")){
+        if(!phase_one && kPhase2Debug){
           std::cerr<<"[PHASE2_FINAL] iter="<<phase_iterations
                    <<" max_reduced_cost="<<max_rc
                    <<" max_rc_col="<<max_rc_j<<"\\n";
@@ -284,7 +290,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
         stats.ftran_ms+=elapsed_ms(start);
         ++stats.ftran_solves;
       }
-      if(!phase_one && std::getenv("PHASE2_DEBUG") && phase_iterations<3){
+      if(!phase_one && kPhase2Debug && phase_iterations<3){
         Real ftran_res=0;
         for(Index i=0;i<M;++i){
           Real lhs=0;
@@ -295,7 +301,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
                  <<" ftran_residual="<<ftran_res<<"\\n";
       }
 
-      const auto pivot_start=std::chrono::steady_clock::now();
+      const auto ratio_start=std::chrono::steady_clock::now();
       Real theta=std::numeric_limits<Real>::infinity();
       for(Index i=0;i<M;++i) if(direction[i]>options_.pivot_tolerance){
         const Real t=x[sys.basis[i]]/direction[i];
@@ -304,6 +310,8 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       }
       if(!std::isfinite(theta)) return SolveStatus::Unbounded;
 
+      stats.ratio_test_ms+=elapsed_ms(ratio_start);
+      const auto basis_update_start=std::chrono::steady_clock::now();
       const Real harris_tol=options_.primal_tolerance*
           std::max<Real>(1.0,std::abs(theta));
       const Real harris_upper=theta+harris_tol;
@@ -316,12 +324,12 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
         }
       }
       if(leave<0){
-        if(!phase_one && std::getenv("PHASE2_DEBUG"))
+        if(!phase_one && kPhase2Debug)
           std::cerr<<"[PHASE2_PIVOT] enter="<<enter<<" has no leaving row; direction is unbounded\\n";
         return SolveStatus::NumericalFailure;
       }
 
-      if(!phase_one && std::getenv("PHASE2_DEBUG") && phase_iterations<10){
+      if(!phase_one && kPhase2Debug && phase_iterations<10){
         std::cerr<<"[PHASE2_PIVOT] leave_row="<<leave
                  <<" leave_var="<<sys.basis[leave]
                  <<" pivot="<<direction[leave]
@@ -346,7 +354,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
         theta=std::max<Real>(0,x[sys.basis[leave]]/direction[leave]);
       }
 
-      if(!phase_one && std::getenv("PHASE2_DEBUG") && theta>options_.primal_tolerance){
+      if(!phase_one && kPhase2Debug && theta>options_.primal_tolerance){
         std::cerr<<"[PHASE2_MOVE] iter="<<phase_iterations
                  <<" enter="<<enter
                  <<" leave="<<sys.basis[leave]
@@ -371,7 +379,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       x[sys.basis[leave]]=0;
       sys.basis[leave]=enter;
       ++stats.pivots;
-      stats.pivot_ms+=elapsed_ms(pivot_start);
+      stats.basis_update_ms+=elapsed_ms(basis_update_start);
       if(!refactor()) return SolveStatus::NumericalFailure;
     }
     return SolveStatus::IterationLimit;
@@ -394,7 +402,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
   for(Index j=0;j<total;++j) if(sys.artificial[j])
     artificial_sum+=std::max<Real>(0,x[j]);
 
-  if(std::getenv("PHASE2_DEBUG")){
+  if(kPhase2Debug){
     Real max_rhs=0, max_basic=0;
     Index positive_basic=0;
     for(Index i=0;i<M;++i){
@@ -506,7 +514,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
   }
 
   const Real objective=model.objective_value(primal);
-  if(std::getenv("PHASE2_DEBUG")){
+  if(kPhase2Debug){
     Index positive_original=0;
     Real max_original=0;
     for(Index j=0;j<n;++j){

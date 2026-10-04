@@ -199,6 +199,12 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       if(!lu.solve_transpose(cb,pi)) return SolveStatus::NumericalFailure;
 
       Index enter=-1; Real best=options_.dual_tolerance;
+      Real max_rc=-std::numeric_limits<Real>::infinity();
+      Index max_rc_j=-1;
+      std::size_t artificial_basic_count=0, nonzero_cost_count=0;
+      for(Index q:sys.basis) if(sys.artificial[q]) ++artificial_basic_count;
+      for(Index j=0;j<total;++j)
+        if(std::abs(c[j])>options_.dual_tolerance) ++nonzero_cost_count;
       for(Index j=0;j<total;++j){
         bool basic=false;
         for(Index q:sys.basis) if(q==j){basic=true;break;}
@@ -207,10 +213,22 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
 
         Real rc=c[j];
         for(Index i=0;i<M;++i) rc-=pi[i]*column(j,i);
+        if(!phase_one && rc>max_rc){max_rc=rc;max_rc_j=j;}
         const Real weight=options_.use_devex
             ? std::max<Real>(1.0,devex_weight[j]) : 1.0;
         const Real score=rc/std::sqrt(weight);
         if(score>best){best=score;enter=j;}
+      }
+      if(!phase_one && phase_iterations==0 && std::getenv("PHASE2_DEBUG")){
+        std::cerr<<"[PHASE2_DEBUG] rows="<<M
+                 <<" cols="<<total
+                 <<" artificial_basic="<<artificial_basic_count
+                 <<" nonzero_cost="<<nonzero_cost_count
+                 <<" max_reduced_cost="<<max_rc
+                 <<" max_rc_col="<<max_rc_j
+                 <<" selected="<<enter
+                 <<" basis_first="<<(M?sys.basis[0]:Index(-1))
+                 <<" x_selected="<<((enter>=0)?x[enter]:0)<<"\\n";
       }
       if(enter<0) return SolveStatus::Optimal;
 

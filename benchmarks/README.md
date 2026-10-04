@@ -6,11 +6,11 @@ This directory contains LP instances used to compare the indigenous Phase 2 revi
 
 - `test_small.lp`: 2 variables, 3 constraints. Expected objective: -6.
 - `test_medium.lp`: 3 variables, 3 constraints. Expected objective: -34.
-- `test_bounds.lp`: 2 variables, 3 constraints. Exercises several binding constraints. Expected objective: -22.
+- `test_bounds.lp`: 2 variables, 3 constraints. Exercises several binding constraints. Expected objective: -22.8.
 - `test_degenerate.lp`: 2 variables, 4 constraints. Contains redundant/binding structure. Expected objective: -2.
 - `test_multiple_opt.lp`: 2 variables, 3 constraints. Has multiple optimal solutions along `x + y = 4`. Expected objective: -4.
-- `test_mixed.lp`: 3 variables, 3 constraints. Uses mixed positive and negative objective/constraint coefficients. Expected objective: -24.
-- `test_larger.lp`: 5 variables, 5 constraints. A larger small-scale regression case. Expected objective: -95.
+- `test_mixed.lp`: 3 variables, 3 constraints. Uses mixed positive and negative objective/constraint coefficients. Expected objective: -19.3333333333.
+- `test_larger.lp`: 5 variables, 5 constraints. A larger small-scale regression case. Expected objective: -85.
 
 The models intentionally use only LP syntax currently accepted by the Phase 2 parser: minimization, nonnegative variables by default, and `<=` constraints.
 

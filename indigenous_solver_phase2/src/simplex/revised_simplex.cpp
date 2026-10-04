@@ -10,6 +10,7 @@
 #include "solver/simplex/revised_simplex.hpp"
 #include "solver/linalg/sparse_lu.hpp"
 #include "solver/presolve/presolve.hpp"
+#include "gpu/sparse_pricing.hpp"
 
 namespace solver {
 namespace {
@@ -270,17 +271,77 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       for(Index q:sys.basis) if(sys.artificial[q]) ++artificial_basic_count;
       for(Index j=0;j<total;++j)
         if(std::abs(c[j])>options_.dual_tolerance) ++nonzero_cost_count;
-      for(Index j=0;j<total;++j){
-        if(is_basic[j]) continue;
-        if(!phase_one && sys.artificial[j]) continue;
 
-        Real rc=c[j];
-        for(const auto& [i,value] : sparse_columns[j]) rc-=pi[i]*value;
-        if(!phase_one && rc>max_rc){max_rc=rc;max_rc_j=j;}
-        const Real weight=options_.use_devex
-            ? std::max<Real>(1.0,devex_weight[j]) : 1.0;
-        const Real score=rc/std::sqrt(weight);
-        if(score>best){best=score;enter=j;}
+      // Phase 3 pricing: convert the cached sparse standard-form columns to
+      // CSC arrays once per pricing pass and evaluate all reduced costs through
+      // the backend. On an NVIDIA build this dispatches to CUDA; on this
+      // machine it uses the validated CPU fallback. The original scalar loop
+      // remains available through PHASE3_DISABLE_GPU_PRICING for A/B testing.
+      bool use_phase3_pricing=true;
+#ifdef _WIN32
+      char* disable_value=nullptr;
+      std::size_t disable_size=0;
+      if(_dupenv_s(&disable_value,&disable_size,"PHASE3_DISABLE_GPU_PRICING")==0 &&
+         disable_value!=nullptr){
+        use_phase3_pricing=!(disable_value[0] && disable_value[0]!='0');
+        std::free(disable_value);
+      }
+#else
+      const char* disable_value=std::getenv("PHASE3_DISABLE_GPU_PRICING");
+      use_phase3_pricing=!(disable_value && disable_value[0] && disable_value[0]!='0');
+#endif
+
+      std::vector<Real> reduced_costs;
+      bool backend_pricing_ok=false;
+      if(use_phase3_pricing){
+        std::vector<std::size_t> pricing_offsets(total+1,0);
+        std::vector<std::size_t> pricing_rows;
+        std::vector<double> pricing_values;
+        pricing_rows.reserve([&](){
+          std::size_t nnz=0;
+          for(const auto& column_entries:sparse_columns) nnz+=column_entries.size();
+          return nnz;
+        }());
+        pricing_values.reserve(pricing_rows.capacity());
+        for(Index j=0;j<total;++j){
+          pricing_offsets[static_cast<std::size_t>(j)]=pricing_rows.size();
+          for(const auto& [i,value]:sparse_columns[j]){
+            pricing_rows.push_back(static_cast<std::size_t>(i));
+            pricing_values.push_back(value);
+          }
+        }
+        pricing_offsets[static_cast<std::size_t>(total)]=pricing_rows.size();
+        backend_pricing_ok=indigenous::gpu::sparse_reduced_costs(
+            pricing_offsets,pricing_rows,pricing_values,c,pi,reduced_costs);
+      }
+
+      if(backend_pricing_ok){
+        for(Index j=0;j<total;++j){
+          if(is_basic[j]) continue;
+          if(!phase_one && sys.artificial[j]) continue;
+
+          const Real rc=reduced_costs[static_cast<std::size_t>(j)];
+          if(!phase_one && rc>max_rc){max_rc=rc;max_rc_j=j;}
+          const Real weight=options_.use_devex
+              ? std::max<Real>(1.0,devex_weight[j]) : 1.0;
+          const Real score=rc/std::sqrt(weight);
+          if(score>best){best=score;enter=j;}
+        }
+      } else {
+        // Preserve the original CPU pricing path as a correctness and
+        // failure fallback if the backend rejects the sparse representation.
+        for(Index j=0;j<total;++j){
+          if(is_basic[j]) continue;
+          if(!phase_one && sys.artificial[j]) continue;
+
+          Real rc=c[j];
+          for(const auto& [i,value] : sparse_columns[j]) rc-=pi[i]*value;
+          if(!phase_one && rc>max_rc){max_rc=rc;max_rc_j=j;}
+          const Real weight=options_.use_devex
+              ? std::max<Real>(1.0,devex_weight[j]) : 1.0;
+          const Real score=rc/std::sqrt(weight);
+          if(score>best){best=score;enter=j;}
+        }
       }
       stats.pricing_ms+=elapsed_ms(pricing_start);
       if(!phase_one && phase_iterations==0 && kPhase2Debug){

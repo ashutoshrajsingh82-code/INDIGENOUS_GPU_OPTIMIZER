@@ -197,6 +197,16 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       std::vector<Real> cb(M,0);
       for(Index i=0;i<M;++i) cb[i]=c[sys.basis[i]];
       if(!lu.solve_transpose(cb,pi)) return SolveStatus::NumericalFailure;
+      if(!phase_one && std::getenv("PHASE2_DEBUG") && phase_iterations<3){
+        Real dual_res=0;
+        for(Index k=0;k<M;++k){
+          Real lhs=0;
+          for(Index i=0;i<M;++i) lhs+=column(sys.basis[k],i)*pi[i];
+          dual_res=std::max(dual_res,std::abs(lhs-cb[k]));
+        }
+        std::cerr<<"[PHASE2_LU] iter="<<phase_iterations
+                 <<" dual_residual="<<dual_res<<"\\n";
+      }
 
       Index enter=-1; Real best=options_.dual_tolerance;
       Real max_rc=-std::numeric_limits<Real>::infinity();
@@ -249,6 +259,16 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       std::vector<Real> col(M,0);
       for(Index i=0;i<M;++i) col[i]=column(enter,i);
       if(!lu.solve(col,direction)) return SolveStatus::NumericalFailure;
+      if(!phase_one && std::getenv("PHASE2_DEBUG") && phase_iterations<3){
+        Real ftran_res=0;
+        for(Index i=0;i<M;++i){
+          Real lhs=0;
+          for(Index k=0;k<M;++k) lhs+=column(sys.basis[k],i)*direction[k];
+          ftran_res=std::max(ftran_res,std::abs(lhs-col[i]));
+        }
+        std::cerr<<"[PHASE2_LU] iter="<<phase_iterations
+                 <<" ftran_residual="<<ftran_res<<"\\n";
+      }
 
       Real theta=std::numeric_limits<Real>::infinity();
       for(Index i=0;i<M;++i) if(direction[i]>options_.pivot_tolerance){

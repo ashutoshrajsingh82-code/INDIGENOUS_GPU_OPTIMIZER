@@ -8,6 +8,10 @@ namespace solver {
 bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
   n_=static_cast<Index>(a.size());
   tol_=std::max<Real>(tol, 0);
+  // Keep pivot acceptance strict, but use a much smaller drop tolerance so
+  // small fill-in is not discarded before it can stabilize ill-conditioned
+  // Netlib bases.
+  const Real drop_tol=std::max<Real>(100*std::numeric_limits<Real>::epsilon(), tol_*1e-3);
   min_pivot_=std::numeric_limits<Real>::infinity();
   l_.clear();
   u_.clear();
@@ -25,7 +29,7 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
     }
     perm_[i]=i;
     for(Index j=0;j<n_;++j) {
-      if(std::abs(a[i][j])>tol_) u_[i][j]=a[i][j];
+      if(std::abs(a[i][j])>drop_tol) u_[i][j]=a[i][j];
     }
   }
 
@@ -69,20 +73,20 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
 
       const Real multiplier=col_it->second/pivot_value;
       u_[i].erase(col_it);
-      if(std::abs(multiplier)>tol_) l_[i][k]=multiplier;
+      if(std::abs(multiplier)>drop_tol) l_[i][k]=multiplier;
 
       // U[k] is sparse; propagate only its entries after the pivot.
       for(const auto& [j, value] : u_[k]) {
         if(j<=k) continue;
         const Real updated=u_[i].count(j)?u_[i][j]-multiplier*value
                                         :-multiplier*value;
-        if(std::abs(updated)<=tol_)
+        if(std::abs(updated)<=drop_tol)
           u_[i].erase(j);
         else
           u_[i][j]=updated;
       }
       for(auto it=u_[i].begin(); it!=u_[i].end(); ) {
-        if(std::abs(it->second)<=tol_) it=u_[i].erase(it);
+        if(std::abs(it->second)<=drop_tol) it=u_[i].erase(it);
         else ++it;
       }
     }

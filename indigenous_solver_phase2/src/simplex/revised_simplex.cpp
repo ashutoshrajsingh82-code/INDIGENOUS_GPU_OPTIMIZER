@@ -214,6 +214,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
     stats.lu_factor_pivot_ms+=lu.last_factor_pivot_ms();
     stats.lu_factor_elimination_ms+=lu.last_factor_elimination_ms();
     stats.lu_factor_elimination_affected_rows+=lu.last_factor_elimination_affected_rows();
+    stats.lu_factor_elimination_row_scan_checks+=lu.last_factor_elimination_row_scan_checks();
     stats.lu_factor_elimination_pivot_entries+=lu.last_factor_elimination_pivot_entries();
     stats.lu_factor_elimination_hash_finds+=lu.last_factor_elimination_hash_finds();
     stats.lu_factor_elimination_hash_inserts+=lu.last_factor_elimination_hash_inserts();

@@ -31,11 +31,12 @@ HIGHS_OBJECTIVE_RE = re.compile(
     r"Objective value\s*:\s*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)"
 )
 ITERATIONS_RE = re.compile(r"^Iterations:\s*(\d+)\s*$", re.MULTILINE)
-STATUS_RE = re.compile(r"^Status:\s*(\S+)", re.MULTILINE)
-CERTIFICATE_RE = re.compile(r"^Certificate:\s*(\S+)", re.MULTILINE)
+# When stdout/stderr are merged on Windows, the stream boundary can leave a
+# carriage return or other horizontal whitespace immediately before Status.
+STATUS_RE = re.compile(r"^[\r\t ]*Status:\s*(\S+)", re.MULTILINE)
+CERTIFICATE_RE = re.compile(r"^Certificate:\s*(\S+)\s*$", re.MULTILINE)
 HIGHS_ITERATIONS_RE = re.compile(r"Simplex\s+iterations:\s*(\d+)")
 HIGHS_STATUS_RE = re.compile(r"Model status\s*:\s*(\S+)")
-
 
 def find_highs() -> Path | None:
     env_highs = os.environ.get("HIGHS_EXE")
@@ -48,7 +49,6 @@ def find_highs() -> Path | None:
         if candidate.is_file():
             return candidate
     return None
-
 
 def run_command(command: list[str]) -> tuple[int, str]:
     try:
@@ -64,11 +64,9 @@ def run_command(command: list[str]) -> tuple[int, str]:
         return 127, f"ERROR: {exc}"
     return result.returncode, result.stdout
 
-
 def extract(pattern: re.Pattern[str], text: str) -> str | None:
     match = pattern.search(text)
     return match.group(1) if match else None
-
 
 def model_names() -> list[str]:
     if not MANIFEST.is_file():
@@ -78,7 +76,6 @@ def model_names() -> list[str]:
         for line in MANIFEST.read_text(encoding="utf-8").splitlines()
         if line.strip() and not line.lstrip().startswith("#")
     ]
-
 
 def is_mps_file(path: Path) -> bool:
     """Return True when a file starts like a plain-text MPS model."""
@@ -90,7 +87,6 @@ def is_mps_file(path: Path) -> bool:
     except OSError:
         return False
     return "NAME" in header and "ROWS" in header and "COLUMNS" in header
-
 
 def ensure_models(names: list[str]) -> list[Path]:
     NETLIB_DIR.mkdir(parents=True, exist_ok=True)
@@ -119,7 +115,6 @@ def ensure_models(names: list[str]) -> list[Path]:
                 if path.exists():
                     path.unlink()
     return models
-
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -187,7 +182,6 @@ def main() -> int:
             failures += 1
             continue
 
-        # The harness materializes the compressed Netlib distribution as plain MPS.
         solver_code, solver_out = run_command(
             [str(solver), "solve", str(model), "--max-iters", "100000"]
         )
@@ -262,7 +256,6 @@ def main() -> int:
     print(f"Passed:    {executed - failures}")
     print(f"Failed:    {failures}")
     return 1 if failures else 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -230,7 +230,21 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
                  <<" basis_first="<<(M?sys.basis[0]:Index(-1))
                  <<" x_selected="<<((enter>=0)?x[enter]:0)<<"\\n";
       }
-      if(enter<0) return SolveStatus::Optimal;
+      if(!phase_one && std::getenv("PHASE2_DEBUG") && phase_iterations<10){
+        std::cerr<<"[PHASE2_PIVOT] iter="<<phase_iterations
+                 <<" enter="<<enter
+                 <<" reduced_cost="<<((enter>=0)?max_rc:0)
+                 <<" selected_score="<<best
+                 <<" x_enter="<<((enter>=0)?x[enter]:0)<<"\\n";
+      }
+      if(enter<0){
+        if(!phase_one && std::getenv("PHASE2_DEBUG")){
+          std::cerr<<"[PHASE2_FINAL] iter="<<phase_iterations
+                   <<" max_reduced_cost="<<max_rc
+                   <<" max_rc_col="<<max_rc_j<<"\\n";
+        }
+        return SolveStatus::Optimal;
+      }
 
       std::vector<Real> col(M,0);
       for(Index i=0;i<M;++i) col[i]=column(enter,i);
@@ -255,7 +269,18 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
           if(pivot>best_pivot){best_pivot=pivot;leave=i;}
         }
       }
-      if(leave<0) return SolveStatus::NumericalFailure;
+      if(leave<0){
+        if(!phase_one && std::getenv("PHASE2_DEBUG"))
+          std::cerr<<"[PHASE2_PIVOT] enter="<<enter<<" has no leaving row; direction is unbounded\\n";
+        return SolveStatus::NumericalFailure;
+      }
+
+      if(!phase_one && std::getenv("PHASE2_DEBUG") && phase_iterations<10){
+        std::cerr<<"[PHASE2_PIVOT] leave_row="<<leave
+                 <<" leave_var="<<sys.basis[leave]
+                 <<" pivot="<<direction[leave]
+                 <<" theta="<<std::max<Real>(0,x[sys.basis[leave]]/direction[leave])<<"\\n";
+      }
 
       theta=std::max<Real>(0,x[sys.basis[leave]]/direction[leave]);
       for(Index i=0;i<M;++i) if(i!=leave)

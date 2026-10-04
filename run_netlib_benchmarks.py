@@ -92,6 +92,8 @@ def ensure_models(names: list[str]) -> list[Path]:
         print(f"[DOWNLOAD] {name} <- {url}")
         try:
             urllib.request.urlretrieve(url, destination)
+            if destination.is_file() and destination.stat().st_size > 0:
+                models.append(destination)
         except Exception as exc:
             print(f"[FAIL] {name}: download failed: {exc}")
             if destination.exists():

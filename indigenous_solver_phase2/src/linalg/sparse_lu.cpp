@@ -68,6 +68,13 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
     }
 
     if(pivot!=k) {
+      // Row swaps change which physical row owns each existing entry. Keep
+      // the incidence index as an over-approximation by recording the new
+      // row ids; stale ids are harmless because U is checked below.
+      for(const auto& [j,value] : u_[pivot])
+        if(j>=0 && j<n_) column_rows[j].push_back(k);
+      for(const auto& [j,value] : u_[k])
+        if(j>=0 && j<n_) column_rows[j].push_back(pivot);
       std::swap(u_[pivot],u_[k]);
       std::swap(l_[pivot],l_[k]);
       std::swap(perm_[pivot],perm_[k]);
@@ -153,7 +160,12 @@ bool SparseLU::factorize_sparse_columns(
   // Populate U directly from the sparse basis columns. Unlike the dense
   // factorize() path, this avoids scanning every zero in the basis matrix.
   const auto load_start=std::chrono::steady_clock::now();
+  // Transient over-approximate column incidence. Entries are never removed
+  // from this index; stale row ids are filtered by the authoritative U row map.
+  // This avoids scanning every row just to discover affected rows.
+  std::vector<std::vector<Index>> column_rows(n_);
   for(Index j=0;j<n_;++j) {
+    column_rows[j].reserve(columns[j].size());
     for(const auto& [i,value] : columns[j]) {
       if(i>=n_) {
         n_=0;
@@ -161,6 +173,7 @@ bool SparseLU::factorize_sparse_columns(
       }
       if(std::abs(value)>drop_tol) {
         u_[i][j]=value;
+        column_rows[j].push_back(i);
       }
     }
   }
@@ -214,7 +227,15 @@ bool SparseLU::factorize_sparse_columns(
     for(const auto& [j,value] : u_[k])
       if(j>k) pivot_entries.push_back({j,value});
 
-    for(Index i=k+1;i<n_;++i) {
+    // Discover only rows recorded for this pivot column. Because the index is
+    // intentionally over-approximate, the U lookup below remains authoritative.
+    static std::vector<Index> seen_stamp;
+    static Index stamp=0;
+    if(static_cast<Index>(seen_stamp.size())!=n_) seen_stamp.assign(n_,0);
+    ++stamp;
+    for(const Index i:column_rows[k]) {
+      if(i<=k || i>=n_ || seen_stamp[i]==stamp) continue;
+      seen_stamp[i]=stamp;
       auto col_it=u_[i].find(k);
       ++last_factor_elimination_hash_finds_;
       if(col_it==u_[i].end()) continue;

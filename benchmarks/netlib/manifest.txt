@@ -1,0 +1,12 @@
+# Curated small-to-medium Netlib LP regression subset.
+# Files are fetched from https://www.netlib.org/lp/data/ when --download is used.
+afiro
+adlittle
+blend
+bore3d
+brandy
+grow15
+kb2
+lotfi
+sc50b
+share1b

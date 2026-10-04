@@ -130,7 +130,12 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
     if(leave<0) return {SolveStatus::NumericalFailure,0,{}, {},0,0,iter,"Harris ratio test failed."};
 
     for(Index i=0;i<M;++i) if(i!=leave) x[basis[i]]-=theta*direction[i];
-    x[basis[leave]]=theta;
+
+    // Move the entering variable from its current value to the new basic value.
+    // The previous implementation changed the basis but forgot this assignment,
+    // which caused the returned primal solution to remain at zero.
+    x[enter]=theta;
+    x[basis[leave]]=0;
     basis[leave]=enter;
 
     // Phase 2 correctness gate: explicit refactorization after every pivot.

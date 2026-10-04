@@ -5,6 +5,16 @@
 #include <utility>
 
 namespace solver {
+std::size_t SparseLU::l_nonzeros() const {
+  std::size_t count=0;
+  for(const auto& row:l_) count+=row.size();
+  return count;
+}
+std::size_t SparseLU::u_nonzeros() const {
+  std::size_t count=0;
+  for(const auto& row:u_) count+=row.size();
+  return count;
+}
 bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
   n_=static_cast<Index>(a.size());
   tol_=std::max<Real>(tol, 0);

@@ -213,6 +213,11 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
     stats.lu_factor_load_ms+=lu.last_factor_load_ms();
     stats.lu_factor_pivot_ms+=lu.last_factor_pivot_ms();
     stats.lu_factor_elimination_ms+=lu.last_factor_elimination_ms();
+    stats.lu_factor_elimination_affected_rows+=lu.last_factor_elimination_affected_rows();
+    stats.lu_factor_elimination_pivot_entries+=lu.last_factor_elimination_pivot_entries();
+    stats.lu_factor_elimination_hash_finds+=lu.last_factor_elimination_hash_finds();
+    stats.lu_factor_elimination_hash_inserts+=lu.last_factor_elimination_hash_inserts();
+    stats.lu_factor_elimination_hash_erases+=lu.last_factor_elimination_hash_erases();
     ++stats.lu_factorizations;
     stats.max_lu_nonzeros=std::max(
       stats.max_lu_nonzeros,lu.l_nonzeros()+lu.u_nonzeros());

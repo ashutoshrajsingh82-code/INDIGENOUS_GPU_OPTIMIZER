@@ -10,36 +10,42 @@
 namespace solver {
 namespace {
 constexpr Real kEqTol=1e-10;
+
+struct StandardRow {
+  std::vector<Real> a;
+  Real rhs=0;
+  int sense=0; // -1 <=, 0 =, +1 >=
+};
+
+struct StandardSystem {
+  std::vector<std::vector<Real>> A;
+  std::vector<Real> b;
+  std::vector<Index> basis;
+  std::vector<bool> artificial;
+};
+
+static bool nearly_equal(Real a, Real b, Real tol) {
+  return std::abs(a-b) <= tol*std::max<Real>(1.0,std::max(std::abs(a),std::abs(b)));
+}
 }
 
 SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
   std::string err;
   if(!input.validate(err)) return {SolveStatus::InvalidModel,0,{}, {},0,0,0,err};
 
-  // Phase 2 deliberately operates on the numerically clean canonical LP gate:
-  // finite lower bounds, optional finite upper bounds, and <= constraints.
-  // Equality/>= rows are left for the Phase-2 artificial-variable gate rather
-  // than being silently transformed incorrectly.
   LinearModel model=input;
   presolve(model);
   const Index n=model.variables.size(), m=model.constraints.size();
+
   std::vector<Real> shift(n,0);
   for(Index j=0;j<n;++j){
     const auto& v=model.variables[j];
     if(!std::isfinite(v.lower_bound))
       return {SolveStatus::UnsupportedModel,0,{}, {},0,0,0,
-              "Phase 2 revised simplex currently requires finite variable lower bounds."};
+              "Phase 2 revised simplex requires finite variable lower bounds."};
     shift[j]=v.lower_bound;
   }
-  for(Index i=0;i<m;++i){
-    const auto& r=model.constraints[i];
-    if(std::isfinite(r.lower_bound))
-      return {SolveStatus::UnsupportedModel,0,{}, {},0,0,0,
-              "Phase 2 revised simplex currently requires <= constraints; equality/>= rows are reserved for the artificial-variable gate."};
-  }
 
-  std::vector<std::vector<Real>> A;
-  std::vector<Real> b;
   auto row_of=[&](Index i){
     std::vector<Real> row(n,0);
     for(Index j=0;j<n;++j)
@@ -47,164 +53,291 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
         if(model.A.row_indices()[p]==i){ row[j]=model.A.values()[p]; break; }
     return row;
   };
-  for(Index i=0;i<m;++i) if(model.constraints[i].upper_bound<kInfinity){
-    auto row=row_of(i); Real rhs=model.constraints[i].upper_bound;
-    for(Index j=0;j<n;++j) rhs-=row[j]*shift[j];
-    if(rhs < -options_.primal_tolerance)
-      return {SolveStatus::Infeasible,0,{}, {},0,0,0,"Initial lower-bound shift makes a constraint infeasible."};
-    A.push_back(std::move(row)); b.push_back(rhs);
+
+  // Convert all finite row bounds into <=, =, or >= rows after shifting
+  // variables to nonnegative coordinates. Ranged rows become two inequalities.
+  std::vector<StandardRow> rows;
+  for(Index i=0;i<m;++i){
+    const auto& r=model.constraints[i];
+    auto a=row_of(i);
+    Real lo=r.lower_bound, hi=r.upper_bound;
+    if(std::isfinite(lo) && std::isfinite(hi)){
+      if(nearly_equal(lo,hi,kEqTol)){
+        StandardRow sr{a,hi,0};
+        for(Index j=0;j<n;++j) sr.rhs-=a[j]*shift[j];
+        rows.push_back(std::move(sr));
+      } else {
+        StandardRow up{a,hi,-1};
+        for(Index j=0;j<n;++j) up.rhs-=a[j]*shift[j];
+        rows.push_back(std::move(up));
+        StandardRow low{a,lo,1};
+        for(Index j=0;j<n;++j) low.rhs-=a[j]*shift[j];
+        rows.push_back(std::move(low));
+      }
+    } else if(std::isfinite(hi)){
+      StandardRow sr{a,hi,-1};
+      for(Index j=0;j<n;++j) sr.rhs-=a[j]*shift[j];
+      rows.push_back(std::move(sr));
+    } else if(std::isfinite(lo)){
+      StandardRow sr{a,lo,1};
+      for(Index j=0;j<n;++j) sr.rhs-=a[j]*shift[j];
+      rows.push_back(std::move(sr));
+    } else {
+      // Free row: no restriction.
+    }
   }
+
+  // Finite variable upper bounds are ordinary <= rows after the lower-bound shift.
   for(Index j=0;j<n;++j) if(model.variables[j].upper_bound<kInfinity){
-    std::vector<Real> row(n,0); row[j]=1;
-    A.push_back(std::move(row)); b.push_back(model.variables[j].upper_bound-shift[j]);
+    StandardRow sr;
+    sr.a.assign(n,0); sr.a[j]=1;
+    sr.rhs=model.variables[j].upper_bound-shift[j];
+    sr.sense=-1;
+    rows.push_back(std::move(sr));
   }
 
-  const Index M=A.size(), total=n+M;
+  // Normalize every row so that its RHS is nonnegative. Flipping a row also
+  // flips its inequality direction. Equality rows remain equalities.
+  for(auto& row:rows){
+    if(row.rhs < -options_.primal_tolerance){
+      row.rhs=-row.rhs;
+      for(Real& v:row.a) v=-v;
+      row.sense=-row.sense;
+    } else if(std::abs(row.rhs)<=options_.primal_tolerance){
+      row.rhs=0;
+    }
+  }
+
+  // Build standard form A z = b, z >= 0. <= rows get slacks, >= rows get
+  // surplus plus an artificial variable, and equality rows get an artificial
+  // variable. The resulting basis is immediately feasible for Phase I.
+  StandardSystem sys;
+  const Index M=rows.size();
+  sys.A.resize(M);
+  sys.b.resize(M);
+  std::vector<int> kind(M,0); // 0 slack, 1 artificial, 2 surplus+artificial
+  Index artificial_count=0;
+  for(Index i=0;i<M;++i){
+    sys.A[i]=rows[i].a;
+    sys.b[i]=rows[i].rhs;
+    kind[i]=(rows[i].sense<0)?0:1;
+    if(rows[i].sense>0) ++artificial_count;
+    else if(rows[i].sense==0) ++artificial_count;
+  }
+
+  Index total=n;
+  for(Index i=0;i<M;++i){
+    if(kind[i]==0){
+      ++total; // slack
+    } else if(kind[i]==1){
+      ++total; // artificial
+    } else {
+      ++total; ++total; // surplus + artificial
+    }
+  }
   if(M==0){
-    std::vector<Real> x(n);
-    for(Index j=0;j<n;++j)x[j]=shift[j];
-    return {SolveStatus::Optimal,model.objective_value(x),x,{},0,0,0,"Phase 2 solved an unconstrained bounded LP."};
+    std::vector<Real> primal=shift;
+    return {SolveStatus::Optimal,model.objective_value(primal),primal,{},0,0,0,
+            "Phase 2 solved an unconstrained bounded LP."};
   }
 
-  // Identity slack basis gives an exact feasible start for this canonical gate.
-  std::vector<Index> basis(M);
-  std::vector<Real> x(total,0);
-  for(Index i=0;i<M;++i){basis[i]=n+i;x[n+i]=b[i];}
+  for(auto& row:sys.A) row.resize(total,0);
+  sys.b.resize(M);
+  sys.b.assign(M,0);
+  for(Index i=0;i<M;++i) sys.b[i]=rows[i].rhs;
+  sys.basis.resize(M);
+  sys.artificial.assign(total,false);
+
+  Index next=n;
+  for(Index i=0;i<M;++i){
+    if(rows[i].sense<0){
+      sys.A[i][next]=1;
+      sys.basis[i]=next++;
+    } else if(rows[i].sense>0){
+      sys.A[i][next]=-1; // surplus
+      ++next;
+      sys.A[i][next]=1;  // artificial
+      sys.artificial[next]=true;
+      sys.basis[i]=next++;
+    } else {
+      sys.A[i][next]=1;
+      sys.artificial[next]=true;
+      sys.basis[i]=next++;
+    }
+  }
 
   SparseLU lu;
-  auto column=[&](Index j, Index i)->Real {
-    return j<n ? A[i][j] : (j-n==i ? 1.0 : 0.0);
-  };
+  auto column=[&](Index j, Index i)->Real { return sys.A[i][j]; };
   auto refactor=[&](){
     std::vector<std::vector<Real>> B(M,std::vector<Real>(M,0));
     for(Index k=0;k<M;++k)
       for(Index i=0;i<M;++i)
-        B[i][k]=column(basis[k],i);
+        B[i][k]=column(sys.basis[k],i);
     return lu.factorize(B,options_.pivot_tolerance);
   };
-  if(!refactor()) return {SolveStatus::NumericalFailure,0,{}, {},0,0,0,"Initial basis factorization failed."};
 
-  std::vector<Real> c(total,0);
-  for(Index j=0;j<n;++j)
-    c[j]=model.minimize ? -model.variables[j].objective : model.variables[j].objective;
+  if(!refactor())
+    return {SolveStatus::NumericalFailure,0,{}, {},0,0,0,
+            "Initial Phase I basis factorization failed."};
 
-  // Devex reference weights. Each variable carries a positive estimate of
-  // the squared length of its transformed basis column. The entering score
-  // uses reduced_cost / sqrt(weight); after a pivot, the entering variable's
-  // weight is refreshed from its FTRAN direction. This is the lightweight
-  // Devex update used by this Phase 2 implementation.
+  std::vector<Real> x(total,0);
+  for(Index i=0;i<M;++i) x[sys.basis[i]]=sys.b[i];
+
   std::vector<Real> devex_weight(total,1.0);
   std::vector<Real> pi, direction;
-  std::size_t iter=0;
-  for(;iter<options_.max_iterations;++iter){
-    std::vector<Real> cb(M,0);
-    for(Index i=0;i<M;++i) cb[i]=c[basis[i]];
-    if(!lu.solve_transpose(cb,pi))
-      return {SolveStatus::NumericalFailure,0,{}, {},0,0,iter,"B^T solve failed during pricing."};
+  std::size_t iterations=0;
 
-    Index enter=-1; Real best=options_.dual_tolerance;
-    for(Index j=0;j<total;++j){
-      bool basic=false; for(Index q:basis) if(q==j){basic=true;break;}
-      if(basic) continue;
-      Real rc=c[j];
-      for(Index i=0;i<M;++i){
-        Real a=column(j,i);
-        rc-=pi[i]*a;
+  auto simplex_phase = [&](const std::vector<Real>& c, bool phase_one,
+                           std::size_t& phase_iterations)->SolveStatus {
+    phase_iterations=0;
+    for(;phase_iterations<options_.max_iterations && iterations<options_.max_iterations;
+        ++phase_iterations,++iterations){
+      std::vector<Real> cb(M,0);
+      for(Index i=0;i<M;++i) cb[i]=c[sys.basis[i]];
+      if(!lu.solve_transpose(cb,pi)) return SolveStatus::NumericalFailure;
+
+      Index enter=-1; Real best=options_.dual_tolerance;
+      for(Index j=0;j<total;++j){
+        bool basic=false;
+        for(Index q:sys.basis) if(q==j){basic=true;break;}
+        if(basic) continue;
+        if(!phase_one && sys.artificial[j]) continue;
+
+        Real rc=c[j];
+        for(Index i=0;i<M;++i) rc-=pi[i]*column(j,i);
+        const Real weight=options_.use_devex
+            ? std::max<Real>(1.0,devex_weight[j]) : 1.0;
+        const Real score=rc/std::sqrt(weight);
+        if(score>best){best=score;enter=j;}
       }
-      const Real weight=options_.use_devex
-          ? std::max<Real>(1.0,devex_weight[j])
-          : 1.0;
-      const Real score=rc/std::sqrt(weight);
-      if(score>best){best=score;enter=j;}
-    }
-    if(enter<0) break;
+      if(enter<0) return SolveStatus::Optimal;
 
-    std::vector<Real> col(M,0);
-    for(Index i=0;i<M;++i) col[i]=column(enter,i);
-    if(!lu.solve(col,direction))
-      return {SolveStatus::NumericalFailure,0,{}, {},0,0,iter,"FTRAN failed for entering column."};
+      std::vector<Real> col(M,0);
+      for(Index i=0;i<M;++i) col[i]=column(enter,i);
+      if(!lu.solve(col,direction)) return SolveStatus::NumericalFailure;
 
-    // Harris two-pass ratio test. Pass 1 finds the smallest feasible
-    // step using a relaxed pivot threshold. Pass 2 chooses among all rows
-    // within the Harris tolerance, preferring the strongest pivot. This
-    // separates the feasibility bound from the numerical tie-breaking rule.
-    Real theta=std::numeric_limits<Real>::infinity();
-    for(Index i=0;i<M;++i) if(direction[i]>options_.pivot_tolerance){
-      const Real t=x[basis[i]]/direction[i];
-      if(t>=-options_.primal_tolerance) theta=std::min(theta,std::max<Real>(0,t));
-    }
-    if(!std::isfinite(theta))
-      return {SolveStatus::Unbounded,0,{}, {},0,0,iter,"No limiting basic variable for the entering column."};
+      Real theta=std::numeric_limits<Real>::infinity();
+      for(Index i=0;i<M;++i) if(direction[i]>options_.pivot_tolerance){
+        const Real t=x[sys.basis[i]]/direction[i];
+        if(t>=-options_.primal_tolerance)
+          theta=std::min(theta,std::max<Real>(0,t));
+      }
+      if(!std::isfinite(theta)) return SolveStatus::Unbounded;
 
-    const Real harris_tol=options_.primal_tolerance*
-        std::max<Real>(1.0,std::abs(theta));
-    const Real harris_upper=theta+harris_tol;
-
-    Index leave=-1;
-    Real best_pivot=-1;
-    for(Index i=0;i<M;++i) if(direction[i]>options_.pivot_tolerance){
-      const Real t=std::max<Real>(0,x[basis[i]]/direction[i]);
-      if(t<=harris_upper){
-        const Real pivot=direction[i];
-        if(pivot>best_pivot){
-          best_pivot=pivot;
-          leave=i;
+      const Real harris_tol=options_.primal_tolerance*
+          std::max<Real>(1.0,std::abs(theta));
+      const Real harris_upper=theta+harris_tol;
+      Index leave=-1; Real best_pivot=-1;
+      for(Index i=0;i<M;++i) if(direction[i]>options_.pivot_tolerance){
+        const Real t=std::max<Real>(0,x[sys.basis[i]]/direction[i]);
+        if(t<=harris_upper){
+          const Real pivot=direction[i];
+          if(pivot>best_pivot){best_pivot=pivot;leave=i;}
         }
       }
-    }
-    if(leave<0)
-      return {SolveStatus::NumericalFailure,0,{}, {},0,0,iter,
-              "Harris two-pass ratio test failed."};
+      if(leave<0) return SolveStatus::NumericalFailure;
 
-    // Recompute the actual step from the selected leaving row. A Harris
-    // candidate may be slightly above the minimum ratio within tolerance;
-    // using its exact ratio preserves primal feasibility after the pivot.
-    theta=std::max<Real>(0,x[basis[leave]]/direction[leave]);
+      theta=std::max<Real>(0,x[sys.basis[leave]]/direction[leave]);
+      for(Index i=0;i<M;++i) if(i!=leave)
+        x[sys.basis[i]]-=theta*direction[i];
 
-    for(Index i=0;i<M;++i) if(i!=leave) x[basis[i]]-=theta*direction[i];
-
-    // Devex update. The transformed entering column is direction = B^{-1} a_j.
-    // Its squared length in the current Devex metric is estimated by the
-    // weighted sum of the basic directions. Keep a floor of one so weights
-    // remain well-conditioned and never suppress a valid improving variable.
-    if(options_.use_devex){
-      Real new_weight=1.0;
-      for(Index i=0;i<M;++i){
-        const Real w=std::max<Real>(1.0,devex_weight[basis[i]]);
-        new_weight+=w*direction[i]*direction[i];
+      if(options_.use_devex){
+        Real new_weight=1.0;
+        for(Index i=0;i<M;++i){
+          const Real w=std::max<Real>(1.0,devex_weight[sys.basis[i]]);
+          new_weight+=w*direction[i]*direction[i];
+        }
+        devex_weight[enter]=std::max<Real>(1.0,new_weight);
+        if(devex_weight[enter]>1e12)
+          for(Real& w:devex_weight) w=1.0;
       }
-      devex_weight[enter]=std::max<Real>(1.0,new_weight);
 
-      // Periodically reset very large weights. This is a numerical safeguard,
-      // not a refactorization trigger.
-      if(devex_weight[enter]>1e12){
-        for(Real& w:devex_weight) w=1.0;
-      }
+      x[enter]=theta;
+      x[sys.basis[leave]]=0;
+      sys.basis[leave]=enter;
+      if(!refactor()) return SolveStatus::NumericalFailure;
     }
+    return SolveStatus::IterationLimit;
+  };
 
-    // Move the entering variable from its current value to the new basic value.
-    // The previous implementation changed the basis but forgot this assignment,
-    // which caused the returned primal solution to remain at zero.
-    x[enter]=theta;
-    x[basis[leave]]=0;
-    basis[leave]=enter;
+  // Phase I minimizes the sum of artificial variables. The internal simplex
+  // convention maximizes c^T z, hence artificial costs are -1.
+  std::vector<Real> phase1_c(total,0);
+  for(Index j=0;j<total;++j) if(sys.artificial[j]) phase1_c[j]=-1;
+  std::size_t phase1_iters=0;
+  const SolveStatus p1=simplex_phase(phase1_c,true,phase1_iters);
+  if(p1==SolveStatus::IterationLimit)
+    return {p1,0,{}, {},0,0,iterations,
+            "Phase I iteration limit reached."};
+  if(p1!=SolveStatus::Optimal)
+    return {p1,0,{}, {},0,0,iterations,
+            "Phase I simplex failed."};
 
-    // Phase 2 correctness gate: explicit refactorization after every pivot.
-    // Product-form / Forrest-Tomlin updates are a subsequent performance gate.
-    if(!refactor()) return {SolveStatus::NumericalFailure,0,{}, {},0,0,iter,"Basis refactorization failed."};
+  Real artificial_sum=0;
+  for(Index j=0;j<total;++j) if(sys.artificial[j])
+    artificial_sum+=std::max<Real>(0,x[j]);
+  if(artificial_sum>options_.primal_tolerance*std::max<Real>(1.0,M)){
+    return {SolveStatus::Infeasible,0,{}, {},artificial_sum,0,iterations,
+            "Phase I optimum is positive; model is infeasible."};
   }
+
+  // Remove zero-valued artificial variables from the basis where possible.
+  // A remaining zero artificial basic variable is harmless only when its row
+  // is redundant, so it is retained but forbidden from entering Phase II.
+  for(Index row=0;row<M;++row){
+    const Index basic=sys.basis[row];
+    if(!sys.artificial[basic] || x[basic]>options_.primal_tolerance) continue;
+
+    std::vector<Real> cb(M,0), d;
+    for(Index i=0;i<M;++i) cb[i]=0;
+    if(!lu.solve_transpose(cb,pi)) return {SolveStatus::NumericalFailure,0,{}, {},0,0,iterations,"Phase I cleanup failed."};
+
+    Index enter=-1;
+    for(Index j=0;j<total;++j){
+      if(sys.artificial[j]) continue;
+      bool is_basic=false;
+      for(Index q:sys.basis) if(q==j){is_basic=true;break;}
+      if(is_basic) continue;
+      std::vector<Real> col(M,0);
+      for(Index i=0;i<M;++i) col[i]=column(j,i);
+      if(!lu.solve(col,d)) return {SolveStatus::NumericalFailure,0,{}, {},0,0,iterations,"Phase I cleanup FTRAN failed."};
+      if(std::abs(d[row])>options_.pivot_tolerance){ enter=j; break; }
+    }
+    if(enter>=0){
+      x[enter]=0;
+      x[basic]=0;
+      sys.basis[row]=enter;
+      if(!refactor()) return {SolveStatus::NumericalFailure,0,{}, {},0,0,iterations,"Phase I cleanup refactorization failed."};
+    }
+  }
+
+  std::vector<Real> phase2_c(total,0);
+  for(Index j=0;j<n;++j)
+    phase2_c[j]=model.minimize ? -model.variables[j].objective
+                               : model.variables[j].objective;
+
+  std::size_t phase2_iters=0;
+  const SolveStatus p2=simplex_phase(phase2_c,false,phase2_iters);
+  if(p2==SolveStatus::IterationLimit)
+    return {p2,0,{}, {},0,0,iterations,"Phase II iteration limit reached."};
+  if(p2!=SolveStatus::Optimal)
+    return {p2,0,{}, {},0,0,iterations,
+            p2==SolveStatus::Unbounded?"Phase II found an unbounded objective.":
+            "Phase II simplex failed."};
 
   std::vector<Real> primal(n,0);
   for(Index j=0;j<n;++j) primal[j]=shift[j]+std::max<Real>(0,x[j]);
-  Real pres=0; std::vector<Real> ax; model.A.multiply(primal,ax);
+
+  Real pres=0;
+  std::vector<Real> ax;
+  model.A.multiply(primal,ax);
   for(Index i=0;i<m;++i){
     pres=std::max(pres,std::max<Real>(0,model.constraints[i].lower_bound-ax[i]));
     pres=std::max(pres,std::max<Real>(0,ax[i]-model.constraints[i].upper_bound));
   }
+
   const Real objective=model.objective_value(primal);
-  const SolveStatus status=iter>=options_.max_iterations?SolveStatus::IterationLimit:SolveStatus::Optimal;
-  return {status,objective,primal,{},pres,0,iter,
-          status==SolveStatus::Optimal?"Phase 2 revised simplex optimal solution found.":
-          "Phase 2 iteration limit reached."};
+  return {SolveStatus::Optimal,objective,primal,{},pres,0,iterations,
+          "Phase I feasible basis constructed; Phase II revised simplex optimal solution found."};
 }
 }

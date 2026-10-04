@@ -28,7 +28,7 @@ Use `--solver` or `--highs` to override executable locations, and `--tolerance` 
 
 ## Netlib validation subset
 
-The repository also contains a curated manifest at `benchmarks/netlib/manifest.txt`. The model files are intentionally not committed; the harness downloads them from the Netlib LP data repository when requested. Netlib is the source repository for these public mathematical optimization data files. Netlib LP data repository: https://www.netlib.org/lp/data/
+The repository also contains a curated manifest at `benchmarks/netlib/manifest.txt`. The model files are intentionally not committed. The harness downloads the compressed Netlib MPS distribution from the COIN-OR Data-Netlib mirror and expands each file to plain-text MPS before running it. The original dataset is the classic Netlib LP collection.
 
 From the repository root, download the subset and compare it against HiGHS:
 
@@ -48,4 +48,4 @@ To run selected models from the manifest:
 python run_netlib_benchmarks.py --download afiro adlittle blend
 ```
 
-The harness requires the Phase 2 CLI to report `OPTIMAL` with a passing certificate and requires its objective to agree with HiGHS within the configured tolerance. A model that the current Phase 2 implementation cannot parse or solve is reported as a failure rather than silently omitted.
+The harness requires the Phase 2 CLI to report `OPTIMAL` with a passing certificate and requires its objective to agree with HiGHS within the configured tolerance. A model that the current Phase 2 implementation cannot parse or solve is reported as a failure rather than silently omitted. If an older compressed-format download is already present, rerun with `--download`; the harness detects non-MPS files and replaces them with expanded MPS models.

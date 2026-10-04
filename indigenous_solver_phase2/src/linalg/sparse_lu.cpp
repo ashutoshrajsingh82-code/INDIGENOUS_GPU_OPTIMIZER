@@ -6,6 +6,17 @@
 #include <utility>
 
 namespace solver {
+void SparseLU::rebuild_solve_cache() {
+  l_solve_rows_.resize(n_);
+  u_solve_rows_.resize(n_);
+  u_diagonal_.resize(n_);
+  for(Index i=0;i<n_;++i) {
+    l_solve_rows_[i].assign(l_[i].begin(),l_[i].end());
+    u_solve_rows_[i].assign(u_[i].begin(),u_[i].end());
+    auto diag=u_[i].find(i);
+    u_diagonal_[i]=(diag==u_[i].end()) ? Real(0) : diag->second;
+  }
+}
 std::size_t SparseLU::l_nonzeros() const {
   std::size_t count=0;
   for(const auto& row:l_) count+=row.size();
@@ -116,6 +127,7 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
     }
   }
 
+  if(std::isfinite(min_pivot_)) rebuild_solve_cache();
   return std::isfinite(min_pivot_);
 }
 
@@ -243,6 +255,7 @@ bool SparseLU::factorize_sparse_columns(
     last_factor_elimination_ms_+=std::chrono::duration<double,std::milli>(
         std::chrono::steady_clock::now()-elimination_start).count();
   }
+  if(std::isfinite(min_pivot_)) rebuild_solve_cache();
   return std::isfinite(min_pivot_);
 }
 
@@ -275,19 +288,19 @@ bool SparseLU::solve(const std::vector<Real>& b,
   x.resize(n_);
   for(Index i=0;i<n_;++i) {
     x[i]=b[perm_[i]];
-    for(const auto& [j,value] : l_[i])
+    for(const auto& [j,value] : l_solve_rows_[i])
       if(j<i) x[i]-=value*x[j];
   }
 
   // U*x=y.
   for(Index ii=n_; ii-->0; ) {
     Real rhs=x[ii];
-    for(const auto& [j,value] : u_[ii])
+    for(const auto& [j,value] : u_solve_rows_[ii])
       if(j>ii) rhs-=value*x[j];
 
-    auto diag=u_[ii].find(ii);
-    if(diag==u_[ii].end() || std::abs(diag->second)<=tol_) return false;
-    x[ii]=rhs/diag->second;
+    const Real diag=u_diagonal_[ii];
+    if(std::abs(diag)<=tol_) return false;
+    x[ii]=rhs/diag;
   }
 
   // B_current = B_base * E_1 * ... * E_k. For an eta matrix E whose
@@ -330,17 +343,17 @@ bool SparseLU::solve_transpose(const std::vector<Real>& b,
   // U^T*x=x. Scatter each solved component through the existing sparse row
   // entries instead of scanning all preceding columns.
   for(Index i=0;i<n_;++i) {
-    auto diag=u_[i].find(i);
-    if(diag==u_[i].end() || std::abs(diag->second)<=tol_) return false;
-    x[i]/=diag->second;
-    for(const auto& [j,value] : u_[i]) {
+    const Real diag=u_diagonal_[i];
+    if(std::abs(diag)<=tol_) return false;
+    x[i]/=diag;
+    for(const auto& [j,value] : u_solve_rows_[i]) {
       if(j>i) x[j]-=value*x[i];
     }
   }
 
   // L^T*x=x. L has an implicit unit diagonal.
   for(Index i=n_; i-->0; ) {
-    for(const auto& [j,value] : l_[i]) {
+    for(const auto& [j,value] : l_solve_rows_[i]) {
       if(j<i) x[j]-=value*x[i];
     }
   }

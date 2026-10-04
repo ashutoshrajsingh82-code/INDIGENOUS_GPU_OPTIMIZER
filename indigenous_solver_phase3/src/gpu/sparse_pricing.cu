@@ -111,7 +111,6 @@ bool SparsePricingWorkspace::compute(
     const std::vector<double>& dual,
     std::vector<double>& reduced_costs) {
   if(!impl_ || !impl_->initialized) return false;
-  for(std::size_t row : impl_->column_count ? std::vector<std::size_t>{} : std::vector<std::size_t>{}) (void)row;
   if(dual.empty()) return false;
   if(dual.size()>impl_->dual_capacity){
     if(impl_->d_dual) cudaFree(impl_->d_dual);

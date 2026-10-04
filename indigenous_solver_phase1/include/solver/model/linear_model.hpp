@@ -13,6 +13,8 @@ struct SimplexStatistics {
   double total_ms=0;
   double lu_factorization_ms=0;
   double lu_update_ms=0;
+  double eta_forward_ms=0;
+  double eta_transpose_ms=0;
   double ftran_ms=0;
   double btran_ms=0;
   double pricing_ms=0;

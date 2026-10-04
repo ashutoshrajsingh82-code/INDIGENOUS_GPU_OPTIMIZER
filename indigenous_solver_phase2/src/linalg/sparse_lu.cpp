@@ -217,20 +217,37 @@ bool SparseLU::factorize_sparse_columns(
       u_[i].erase(col_it);
       if(std::abs(multiplier)>drop_tol) l_[i][k]=multiplier;
 
+      // Use a temporary dense row workspace for direct indexed updates.
+      // The sparse hash map remains the authoritative representation, while
+      // this avoids one hash lookup per pivot-row entry in the hot loop.
+      std::vector<Real> row_values(n_,0);
+      std::vector<unsigned char> row_present(n_,0);
+      for(const auto& [j,row_value] : u_[i]) {
+        if(j<n_) {
+          row_values[j]=row_value;
+          row_present[j]=1;
+        }
+      }
       for(const auto& [j,value] : pivot_entries) {
         ++last_factor_elimination_pivot_entries_;
-        auto existing=u_[i].find(j);
-        ++last_factor_elimination_hash_finds_;
-        if(existing==u_[i].end()) {
-          const Real updated=-multiplier*value;
-          if(std::abs(updated)>drop_tol)
+        if(row_present[j]) {
+          const Real updated=row_values[j]-multiplier*value;
+          if(std::abs(updated)<=drop_tol) {
+            row_present[j]=0;
+            u_[i].erase(j);
+            ++last_factor_elimination_hash_erases_;
+          } else {
+            row_values[j]=updated;
             u_[i][j]=updated;
+          }
         } else {
-          const Real updated=existing->second-multiplier*value;
-          if(std::abs(updated)<=drop_tol)
-            u_[i].erase(existing);
-          else
-            existing->second=updated;
+          const Real updated=-multiplier*value;
+          if(std::abs(updated)>drop_tol) {
+            row_values[j]=updated;
+            row_present[j]=1;
+            u_[i][j]=updated;
+            ++last_factor_elimination_hash_inserts_;
+          }
         }
       }
     }

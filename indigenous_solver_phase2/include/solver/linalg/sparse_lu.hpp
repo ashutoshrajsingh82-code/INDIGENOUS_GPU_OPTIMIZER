@@ -83,6 +83,11 @@ private:
 
   // Product-form updates after the most recent full factorization.
   std::vector<EtaUpdate> etas_;
+
+  // Reused workspace for the final row-permutation step in BTRAN. Keeping
+  // this outside solve_transpose() avoids allocating a full vector on every
+  // simplex iteration.
+  mutable std::vector<Real> transpose_workspace_;
 };
 
 } // namespace solver

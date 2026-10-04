@@ -46,7 +46,7 @@ struct StandardSystem {
 static bool nearly_equal(Real a, Real b, Real tol) {
   return std::abs(a-b) <= tol*std::max<Real>(1.0,std::max(std::abs(a),std::abs(b)));
 }
-
+}
 
 SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
   const auto solve_start=std::chrono::steady_clock::now();

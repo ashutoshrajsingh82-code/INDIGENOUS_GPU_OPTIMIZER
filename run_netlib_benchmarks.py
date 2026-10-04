@@ -237,7 +237,9 @@ def main() -> int:
             f"limit={comparison_limit_text} "
             f"iterations={iterations} "
             f"highs_iterations={highs_iterations} "
-            f"certificate={certificate}"
+            f"certificate={certificate} "
+            f"solver_rc={solver_code} "
+            f"highs_rc={highs_code}"
         )
 
         executed += 1

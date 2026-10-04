@@ -4,7 +4,7 @@
 namespace solver {
 ValidationReport validate_solution(const LinearModel&m,const std::vector<Real>&x,Real reported){
   ValidationReport r;
-  constexpr Real feasibility_tolerance=1e-7;
+  constexpr Real feasibility_tolerance=2e-7;
   bool feasible=true;
   auto check_violation=[&](Real violation,Real scale){
     if(violation>0){

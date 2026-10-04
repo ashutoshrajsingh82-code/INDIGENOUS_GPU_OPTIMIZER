@@ -166,7 +166,18 @@ bool SparseLU::solve_transpose(const std::vector<Real>& b,
 
   // A^T*x=b and P*A=L*U imply:
   // U^T*y=b, L^T*z=y, P*x=z.
-  std::vector<Real> y=b;
+  // B_current^T = E_k^T ... E_1^T B_base^T. Solve the eta system first,
+  // in reverse update order, then solve the base transpose factors.
+  std::vector<Real> transformed=b;
+  for(auto it=etas_.rbegin();it!=etas_.rend();++it) {
+    const auto& eta=*it;
+    Real sum=0;
+    for(Index i=0;i<n_;++i) if(i!=eta.pivot_row)
+      sum+=eta.direction[i]*transformed[i];
+    transformed[eta.pivot_row]=(transformed[eta.pivot_row]-sum)/eta.pivot;
+  }
+
+  std::vector<Real> y=transformed;
   for(Index i=0;i<n_;++i) {
     auto diag=u_[i].find(i);
     if(diag==u_[i].end() || std::abs(diag->second)<=tol_) return false;
@@ -187,17 +198,6 @@ bool SparseLU::solve_transpose(const std::vector<Real>& b,
 
   x.assign(n_,0);
   for(Index i=0;i<n_;++i) x[perm_[i]]=z[i];
-
-  // For B_current^T = E_k^T ... E_1^T B_base^T, solve each E_i^T
-  // in reverse order before the base transpose solve. The transformed
-  // right-hand side is returned in x.
-  for(auto it=etas_.rbegin();it!=etas_.rend();++it) {
-    const auto& eta=*it;
-    Real sum=0;
-    for(Index i=0;i<n_;++i) if(i!=eta.pivot_row)
-      sum+=eta.direction[i]*x[i];
-    x[eta.pivot_row]=(x[eta.pivot_row]-sum)/eta.pivot;
-  }
   return true;
 }
 

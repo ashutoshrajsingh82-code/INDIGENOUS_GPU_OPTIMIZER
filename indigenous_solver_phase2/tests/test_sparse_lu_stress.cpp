@@ -152,6 +152,39 @@ int main() {
     ++cases;
   }
 
+  // Product-form eta updates: replace basis columns without refactorizing
+  // and verify both forward and transpose solves against the updated basis.
+  {
+    SparseLU lu;
+    const std::vector<std::vector<Real>> identity{
+      {1,0,0},
+      {0,1,0},
+      {0,0,1}
+    };
+    check(lu.factorize(identity),"eta base factorization");
+
+    const std::vector<Real> d1{2,3,4};
+    check(lu.update(d1,1),"eta first update");
+    const std::vector<Real> d2{1,-2,5};
+    check(lu.update(d2,2),"eta second update");
+    check(lu.update_count()==2,"eta update count");
+
+    const std::vector<std::vector<Real>> updated{
+      {1,0,0},
+      {2,3,4},
+      {1,-2,5}
+    };
+    const std::vector<Real> expected{1.5,-0.5,2.0};
+    const auto b=multiply(updated,expected);
+    std::vector<Real> x,xt;
+    check(lu.solve(b,x),"eta updated solve");
+    check(max_residual(updated,x,b)<1e-10,"eta updated residual");
+    check(lu.solve_transpose(b,xt),"eta updated transpose solve");
+    check(max_transpose_residual(updated,xt,b)<1e-10,
+          "eta updated transpose residual");
+    ++cases;
+  }
+
   // A repeated row is singular and must be rejected rather than producing
   // a non-finite solution.
   {

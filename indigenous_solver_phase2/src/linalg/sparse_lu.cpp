@@ -72,9 +72,9 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
       // the incidence index as an over-approximation by recording the new
       // row ids; stale ids are harmless because U is checked below.
       for(const auto& [j,value] : u_[pivot])
-        if(j>=0 && j<n_) column_rows[j].push_back(k);
+        column_rows[j].push_back(k);
       for(const auto& [j,value] : u_[k])
-        if(j>=0 && j<n_) column_rows[j].push_back(pivot);
+        column_rows[j].push_back(pivot);
       std::swap(u_[pivot],u_[k]);
       std::swap(l_[pivot],l_[k]);
       std::swap(perm_[pivot],perm_[k]);
@@ -109,6 +109,7 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
           const Real updated=-multiplier*value;
           if(std::abs(updated)>drop_tol) {
             u_[i][j]=updated;
+            column_rows[j].push_back(i);
             ++last_factor_elimination_hash_inserts_;
           }
         } else {
@@ -229,10 +230,8 @@ bool SparseLU::factorize_sparse_columns(
 
     // Discover only rows recorded for this pivot column. Because the index is
     // intentionally over-approximate, the U lookup below remains authoritative.
-    static std::vector<Index> seen_stamp;
-    static Index stamp=0;
-    if(static_cast<Index>(seen_stamp.size())!=n_) seen_stamp.assign(n_,0);
-    ++stamp;
+    std::vector<Index> seen_stamp(n_,0);
+    const Index stamp=1;
     for(const Index i:column_rows[k]) {
       if(i<=k || i>=n_ || seen_stamp[i]==stamp) continue;
       seen_stamp[i]=stamp;

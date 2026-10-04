@@ -16,11 +16,10 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
   std::string err;
   if(!input.validate(err)) return {SolveStatus::InvalidModel,0,{}, {},0,0,0,err};
 
-  // Phase 2 deliberately operates on the numerically clean canonical LP gate:
-  // finite lower bounds, optional finite upper bounds, and <= constraints.
-  // Equality/>= rows are left for the Phase-2 artificial-variable gate rather
-  // than being silently transformed incorrectly.
-  LinearModel model=input;
+  // Normalize all row senses to <= form. Equality rows become two opposing
+  // inequalities, while >= rows are multiplied by -1. This is an exact
+  // transformation and lets the Phase 2 basis construction remain the simple
+  // identity-slack canonical form.
   presolve(model);
   const Index n=model.variables.size(), m=model.constraints.size();
   std::vector<Real> shift(n,0);
@@ -31,13 +30,6 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
               "Phase 2 revised simplex currently requires finite variable lower bounds."};
     shift[j]=v.lower_bound;
   }
-  for(Index i=0;i<m;++i){
-    const auto& r=model.constraints[i];
-    if(std::isfinite(r.lower_bound))
-      return {SolveStatus::UnsupportedModel,0,{}, {},0,0,0,
-              "Phase 2 revised simplex currently requires <= constraints; equality/>= rows are reserved for the artificial-variable gate."};
-  }
-
   std::vector<std::vector<Real>> A;
   std::vector<Real> b;
   auto row_of=[&](Index i){
@@ -47,12 +39,33 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
         if(model.A.row_indices()[p]==i){ row[j]=model.A.values()[p]; break; }
     return row;
   };
-  for(Index i=0;i<m;++i) if(model.constraints[i].upper_bound<kInfinity){
-    auto row=row_of(i); Real rhs=model.constraints[i].upper_bound;
+  auto add_leq_row=[&](std::vector<Real> row, Real rhs){
     for(Index j=0;j<n;++j) rhs-=row[j]*shift[j];
     if(rhs < -options_.primal_tolerance)
-      return {SolveStatus::Infeasible,0,{}, {},0,0,0,"Initial lower-bound shift makes a constraint infeasible."};
+      return false;
     A.push_back(std::move(row)); b.push_back(rhs);
+    return true;
+  };
+
+  for(Index i=0;i<m;++i){
+    const auto& r=model.constraints[i];
+    const auto row=row_of(i);
+    if(r.upper_bound<kInfinity){
+      if(!add_leq_row(row,r.upper_bound))
+        return {SolveStatus::Infeasible,0,{}, {},0,0,0,"Initial lower-bound shift makes a constraint infeasible."};
+    }
+    if(r.lower_bound>-kInfinity &&
+       !(r.upper_bound<kInfinity && std::abs(r.upper_bound-r.lower_bound)<=options_.primal_tolerance)){
+      std::vector<Real> neg=row;
+      for(Real& v:neg) v=-v;
+      if(!add_leq_row(std::move(neg),-r.lower_bound))
+        return {SolveStatus::Infeasible,0,{}, {},0,0,0,"Initial lower-bound shift makes a constraint infeasible."};
+    } else if(r.lower_bound>-kInfinity && r.upper_bound>=kInfinity){
+      std::vector<Real> neg=row;
+      for(Real& v:neg) v=-v;
+      if(!add_leq_row(std::move(neg),-r.lower_bound))
+        return {SolveStatus::Infeasible,0,{}, {},0,0,0,"Initial lower-bound shift makes a constraint infeasible."};
+    }
   }
   for(Index j=0;j<n;++j) if(model.variables[j].upper_bound<kInfinity){
     std::vector<Real> row(n,0); row[j]=1;

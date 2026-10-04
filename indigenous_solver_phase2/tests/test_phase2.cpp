@@ -33,6 +33,13 @@ int main(){
   check(std::abs(r.objective_value+6)<1e-7,"revised simplex objective");
   auto v=validate_solution(m,r.primal,r.objective_value);
   check(v.valid,"certificate");
+  check(r.statistics.total_ms>=0,"simplex total timing");
+  check(r.statistics.lu_factorizations>0,"simplex LU factorization count");
+  check(r.statistics.btran_solves>0,"simplex BTRAN count");
+  check(r.statistics.ftran_solves>0,"simplex FTRAN count");
+  check(r.statistics.pivots>0,"simplex pivot count");
+  check(r.statistics.lu_factorization_ms>=0,"simplex LU timing");
+  check(r.statistics.pricing_ms>=0,"simplex pricing timing");
 
   RevisedSimplexOptions no_devex; no_devex.use_devex=false;
   auto plain=RevisedSimplexSolver{no_devex}.solve(m);

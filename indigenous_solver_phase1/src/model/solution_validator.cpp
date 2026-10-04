@@ -34,3 +34,4 @@ ValidationReport validate_solution(const LinearModel&m,const std::vector<Real>&x
   r.message=r.valid?"solution satisfies primal feasibility":"primal feasibility violation";
   return r;
 }
+}

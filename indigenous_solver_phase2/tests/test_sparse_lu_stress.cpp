@@ -22,9 +22,9 @@ static Real max_residual(const std::vector<std::vector<Real>>& a,
                          const std::vector<Real>& x,
                          const std::vector<Real>& b) {
   Real residual=0;
-  for(Index i=0;i<a.size();++i) {
+  for(std::size_t i=0;i<a.size();++i) {
     Real ax=0;
-    for(Index j=0;j<a.size();++j) ax+=a[i][j]*x[j];
+    for(std::size_t j=0;j<a.size();++j) ax+=a[i][j]*x[j];
     residual=std::max(residual,std::abs(ax-b[i]));
   }
   return residual;
@@ -34,9 +34,9 @@ static Real max_transpose_residual(const std::vector<std::vector<Real>>& a,
                                    const std::vector<Real>& x,
                                    const std::vector<Real>& b) {
   Real residual=0;
-  for(Index j=0;j<a.size();++j) {
+  for(std::size_t j=0;j<a.size();++j) {
     Real atx=0;
-    for(Index i=0;i<a.size();++i) atx+=a[i][j]*x[i];
+    for(std::size_t i=0;i<a.size();++i) atx+=a[i][j]*x[i];
     residual=std::max(residual,std::abs(atx-b[j]));
   }
   return residual;
@@ -45,8 +45,8 @@ static Real max_transpose_residual(const std::vector<std::vector<Real>>& a,
 static std::vector<Real> multiply(const std::vector<std::vector<Real>>& a,
                                   const std::vector<Real>& x) {
   std::vector<Real> b(a.size(),0);
-  for(Index i=0;i<a.size();++i)
-    for(Index j=0;j<a.size();++j)
+  for(std::size_t i=0;i<a.size();++i)
+    for(std::size_t j=0;j<a.size();++j)
       b[i]+=a[i][j]*x[j];
   return b;
 }

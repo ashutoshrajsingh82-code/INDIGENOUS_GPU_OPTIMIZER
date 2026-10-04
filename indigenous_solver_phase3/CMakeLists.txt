@@ -31,6 +31,31 @@ else()
   message(STATUS "Phase 3 backend: CUDA unavailable, using CPU fallback")
 endif()
 
+add_library(solver_phase3
+  ../indigenous_solver_phase1/src/common/status.cpp
+  ../indigenous_solver_phase1/src/model/linear_model.cpp
+  ../indigenous_solver_phase1/src/model/solution_validator.cpp
+  ../indigenous_solver_phase1/src/sparse/csc_matrix.cpp
+  ../indigenous_solver_phase1/src/sparse/csr_matrix.cpp
+  ../indigenous_solver_phase1/src/io/lp_reader.cpp
+  ../indigenous_solver_phase1/src/io/mps_reader.cpp
+  ../indigenous_solver_phase2/src/linalg/sparse_lu.cpp
+  ../indigenous_solver_phase2/src/scaling/scaler.cpp
+  ../indigenous_solver_phase2/src/presolve/presolve.cpp
+  ../indigenous_solver_phase2/src/simplex/revised_simplex.cpp
+)
+target_include_directories(solver_phase3 PUBLIC
+  include
+  ../indigenous_solver_phase2/include
+  ../indigenous_solver_phase1/include
+)
+target_link_libraries(solver_phase3 PUBLIC indigenous_gpu_backend)
+
+add_executable(solver_phase3_cli
+  ../indigenous_solver_phase2/tools/solver_cli.cpp
+)
+target_link_libraries(solver_phase3_cli PRIVATE solver_phase3)
+
 add_executable(indigenous_gpu_smoke_test
   tests/gpu_smoke_test.cpp
 )

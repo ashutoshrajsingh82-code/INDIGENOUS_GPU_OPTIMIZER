@@ -12,6 +12,7 @@ struct LinearModel { std::string name="MODEL"; bool minimize=true; std::vector<V
 struct SimplexStatistics {
   double total_ms=0;
   double lu_factorization_ms=0;
+  double lu_update_ms=0;
   double ftran_ms=0;
   double btran_ms=0;
   double pricing_ms=0;
@@ -19,6 +20,7 @@ struct SimplexStatistics {
   double ratio_test_ms=0;
   double basis_update_ms=0;
   std::size_t lu_factorizations=0;
+  std::size_t lu_updates=0;
   std::size_t ftran_solves=0;
   std::size_t btran_solves=0;
   std::size_t pivots=0;

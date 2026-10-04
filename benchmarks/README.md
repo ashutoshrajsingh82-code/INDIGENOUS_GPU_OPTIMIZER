@@ -28,7 +28,7 @@ Use `--solver` or `--highs` to override executable locations, and `--tolerance` 
 
 ## Netlib validation subset
 
-The repository also contains a curated manifest at `benchmarks/netlib/manifest.txt`. The model files are intentionally not committed; the harness downloads them from the Netlib LP data repository when requested. Netlib is the source repository for these public mathematical optimization data files. urlNetlib LP data repositoryhttps://www.netlib.org/lp/data/
+The repository also contains a curated manifest at `benchmarks/netlib/manifest.txt`. The model files are intentionally not committed; the harness downloads them from the Netlib LP data repository when requested. Netlib is the source repository for these public mathematical optimization data files. Netlib LP data repository: https://www.netlib.org/lp/data/
 
 From the repository root, download the subset and compare it against HiGHS:
 

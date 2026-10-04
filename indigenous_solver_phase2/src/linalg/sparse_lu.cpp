@@ -85,6 +85,7 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
 
     // Only rows with a nonzero in the pivot column require elimination.
     for(Index i=k+1;i<n_;++i) {
+      ++last_factor_elimination_row_scan_checks_;
       auto col_it=u_[i].find(k);
       if(col_it==u_[i].end()) continue;
 
@@ -133,6 +134,7 @@ bool SparseLU::factorize_sparse_columns(
   last_factor_pivot_ms_=0;
   last_factor_elimination_ms_=0;
   last_factor_elimination_affected_rows_=0;
+  last_factor_elimination_row_scan_checks_=0;
   last_factor_elimination_pivot_entries_=0;
   last_factor_elimination_hash_finds_=0;
   last_factor_elimination_hash_inserts_=0;

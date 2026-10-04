@@ -88,6 +88,14 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
   for(Index j=0;j<n;++j)
     c[j]=model.minimize ? -model.variables[j].objective : model.variables[j].objective;
 
+  // Devex reference weights. Each variable carries a positive estimate of
+  // the squared length of its transformed basis column. The entering score
+  // uses reduced_cost / sqrt(weight); after a pivot, the entering variable's
+  // weight is refreshed from its FTRAN direction. This is the lightweight
+  // Devex update used by this Phase 2 implementation.
+  std::vector<Real> devex_weight(total,1.0);
+  std::size_t devex_resets=0;
+
   std::vector<Real> pi, direction;
   std::size_t iter=0;
   for(;iter<options_.max_iterations;++iter){
@@ -105,7 +113,10 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
         Real a=column(j,i);
         rc-=pi[i]*a;
       }
-      Real score=rc/std::sqrt(options_.use_devex?std::max<Real>(1,1.0):1.0);
+      const Real weight=options_.use_devex
+          ? std::max<Real>(1.0,devex_weight[j])
+          : 1.0;
+      const Real score=rc/std::sqrt(weight);
       if(score>best){best=score;enter=j;}
     }
     if(enter<0) break;
@@ -130,6 +141,26 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
     if(leave<0) return {SolveStatus::NumericalFailure,0,{}, {},0,0,iter,"Harris ratio test failed."};
 
     for(Index i=0;i<M;++i) if(i!=leave) x[basis[i]]-=theta*direction[i];
+
+    // Devex update. The transformed entering column is direction = B^{-1} a_j.
+    // Its squared length in the current Devex metric is estimated by the
+    // weighted sum of the basic directions. Keep a floor of one so weights
+    // remain well-conditioned and never suppress a valid improving variable.
+    if(options_.use_devex){
+      Real new_weight=1.0;
+      for(Index i=0;i<M;++i){
+        const Real w=std::max<Real>(1.0,devex_weight[basis[i]]);
+        new_weight+=w*direction[i]*direction[i];
+      }
+      devex_weight[enter]=std::max<Real>(1.0,new_weight);
+
+      // Periodically reset very large weights. This is a numerical safeguard,
+      // not a refactorization trigger.
+      if(devex_weight[enter]>1e12){
+        for(Real& w:devex_weight) w=1.0;
+        ++devex_resets;
+      }
+    }
 
     // Move the entering variable from its current value to the new basic value.
     // The previous implementation changed the basis but forgot this assignment,

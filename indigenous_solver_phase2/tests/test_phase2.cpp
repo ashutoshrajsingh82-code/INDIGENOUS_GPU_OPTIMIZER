@@ -40,6 +40,8 @@ int main(){
   check(r.statistics.pivots>0,"simplex pivot count");
   check(r.statistics.lu_factorization_ms>=0,"simplex LU timing");
   check(r.statistics.pricing_ms>=0,"simplex pricing timing");
+  check(r.statistics.ratio_test_ms>=0,"simplex ratio timing");
+  check(r.statistics.basis_update_ms>=0,"simplex basis update timing");
 
   RevisedSimplexOptions no_devex; no_devex.use_devex=false;
   auto plain=RevisedSimplexSolver{no_devex}.solve(m);

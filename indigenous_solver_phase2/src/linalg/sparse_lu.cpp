@@ -106,6 +106,92 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
   return std::isfinite(min_pivot_);
 }
 
+
+bool SparseLU::factorize_sparse_columns(
+    const std::vector<std::vector<std::pair<Index, Real>>>& columns,
+    Index dimension, Real tol) {
+  n_=dimension;
+  tol_=std::max<Real>(tol, 0);
+  const Real drop_tol=std::max<Real>(100*std::numeric_limits<Real>::epsilon(), tol_*1e-3);
+  min_pivot_=std::numeric_limits<Real>::infinity();
+  l_.clear();
+  u_.clear();
+  perm_.clear();
+  etas_.clear();
+
+  if(n_==0 || static_cast<Index>(columns.size())!=n_) {
+    n_=0;
+    return false;
+  }
+  u_.resize(n_);
+  l_.resize(n_);
+  perm_.resize(n_);
+
+  // Populate U directly from the sparse basis columns. Unlike the dense
+  // factorize() path, this avoids scanning every zero in the basis matrix.
+  for(Index j=0;j<n_;++j) {
+    for(const auto& [i,value] : columns[j]) {
+      if(i>=n_) {
+        n_=0;
+        return false;
+      }
+      if(std::abs(value)>drop_tol) u_[i][j]=value;
+    }
+  }
+  for(Index i=0;i<n_;++i) perm_[i]=i;
+
+  for(Index k=0;k<n_;++k) {
+    Index pivot=k;
+    Real column_scale=0;
+    for(Index i=k;i<n_;++i) {
+      auto it=u_[i].find(k);
+      if(it!=u_[i].end()) {
+        column_scale=std::max(column_scale,std::abs(it->second));
+        if(std::abs(it->second)>std::abs(u_[pivot].count(k)?u_[pivot].at(k):0))
+          pivot=i;
+      }
+    }
+    if(column_scale<=tol_) {
+      n_=0;
+      return false;
+    }
+    if(pivot!=k) {
+      std::swap(u_[pivot],u_[k]);
+      std::swap(l_[pivot],l_[k]);
+      std::swap(perm_[pivot],perm_[k]);
+    }
+    auto diag_it=u_[k].find(k);
+    if(diag_it==u_[k].end() ||
+       std::abs(diag_it->second)<=tol_*std::max<Real>(1,column_scale)) {
+      n_=0;
+      return false;
+    }
+    const Real pivot_value=diag_it->second;
+    min_pivot_=std::min(min_pivot_,std::abs(pivot_value));
+    for(Index i=k+1;i<n_;++i) {
+      auto col_it=u_[i].find(k);
+      if(col_it==u_[i].end()) continue;
+      const Real multiplier=col_it->second/pivot_value;
+      u_[i].erase(col_it);
+      if(std::abs(multiplier)>drop_tol) l_[i][k]=multiplier;
+      for(const auto& [j, value] : u_[k]) {
+        if(j<=k) continue;
+        const Real updated=u_[i].count(j)?u_[i][j]-multiplier*value
+                                        :-multiplier*value;
+        if(std::abs(updated)<=drop_tol)
+          u_[i].erase(j);
+        else
+          u_[i][j]=updated;
+      }
+      for(auto it=u_[i].begin(); it!=u_[i].end(); ) {
+        if(std::abs(it->second)<=drop_tol) it=u_[i].erase(it);
+        else ++it;
+      }
+    }
+  }
+  return std::isfinite(min_pivot_);
+}
+
 bool SparseLU::update(const std::vector<Real>& direction,
                      Index leaving_row, Real pivot_tolerance) {
   if(n_==0 || static_cast<Index>(direction.size())!=n_ || leaving_row>=n_)

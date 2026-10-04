@@ -40,6 +40,9 @@ public:
   std::size_t u_nonzeros() const;
   double last_eta_forward_ms() const { return last_eta_forward_ms_; }
   double last_eta_transpose_ms() const { return last_eta_transpose_ms_; }
+  double last_factor_load_ms() const { return last_factor_load_ms_; }
+  double last_factor_pivot_ms() const { return last_factor_pivot_ms_; }
+  double last_factor_elimination_ms() const { return last_factor_elimination_ms_; }
 
 private:
   using Row = std::unordered_map<Index, Real>;
@@ -55,6 +58,9 @@ private:
   Real min_pivot_=0;
   mutable double last_eta_forward_ms_=0;
   mutable double last_eta_transpose_ms_=0;
+  mutable double last_factor_load_ms_=0;
+  mutable double last_factor_pivot_ms_=0;
+  mutable double last_factor_elimination_ms_=0;
 
   // After factorization: P*A = L*U.
   std::vector<Row> l_;

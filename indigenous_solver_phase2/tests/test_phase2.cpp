@@ -1,8 +1,11 @@
 #include <cmath>
 #include <iostream>
+#include <fstream>
+#include <cstdio>
 #include "solver/linalg/sparse_lu.hpp"
 #include "solver/simplex/revised_simplex.hpp"
 #include "solver/model/solution_validator.hpp"
+#include "solver/io/mps_reader.hpp"
 using namespace solver;
 static int fails=0;
 static void check(bool x,const char* m){if(!x){std::cerr<<"FAIL: "<<m<<"\n";++fails;}}
@@ -52,6 +55,23 @@ int main(){
   check(std::abs(dr.primal[0])<1e-7&&std::abs(dr.primal[1]-1)<1e-7,"degenerate Harris primal");
   auto dv=validate_solution(deg,dr.primal,dr.objective_value);
   check(dv.valid,"degenerate Harris certificate");
+
+  // MPS parser regression: repeated entries for the same variable/row
+  // must be aggregated rather than silently keeping only the first entry.
+  {
+    const char* path="phase2_mps_duplicate_test.mps";
+    std::ofstream out(path);
+    out << "NAME DUP\\nROWS\\n N OBJ\\n L C1\\nCOLUMNS\\n X OBJ -1 C1 1\\n X C1 2\\nRHS\\n RHS1 C1 3\\nBOUNDS\\nENDATA\\n";
+    out.close();
+    LinearModel parsed; std::string parse_error;
+    check(read_mps(path,parsed,parse_error),"MPS duplicate-entry parse");
+    check(parsed.variables.size()==1 && parsed.constraints.size()==1,"MPS duplicate-entry dimensions");
+    std::vector<Real> parsed_ax;
+    parsed.A.multiply(std::vector<Real>{1},parsed_ax);
+    check(parsed_ax.size()==1 && std::abs(parsed_ax[0]-3)<1e-12,"MPS duplicate-entry aggregation");
+    check(std::abs(parsed.variables[0].objective+1)<1e-12,"MPS objective parse");
+    std::remove(path);
+  }
 
   // Equality: x + y = 2, with the same bounds/objective as the canonical test.
   LinearModel eq=m; eq.constraints={{"eq",2,2}};

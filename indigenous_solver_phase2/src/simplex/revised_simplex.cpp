@@ -238,6 +238,25 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
   std::vector<Real> pi, direction;
   std::size_t iterations=0;
 
+  // Phase 3 pricing consumes CSC data. The standard-form matrix is immutable
+  // throughout simplex, so build this representation once and reuse it for
+  // every pricing iteration instead of rebuilding it inside the hot loop.
+  std::vector<std::size_t> pricing_offsets(total+1,0);
+  std::vector<std::size_t> pricing_rows;
+  std::vector<double> pricing_values;
+  std::size_t pricing_nnz=0;
+  for(const auto& column_entries:sparse_columns) pricing_nnz+=column_entries.size();
+  pricing_rows.reserve(pricing_nnz);
+  pricing_values.reserve(pricing_nnz);
+  for(Index j=0;j<total;++j){
+    pricing_offsets[static_cast<std::size_t>(j)]=pricing_rows.size();
+    for(const auto& [i,value]:sparse_columns[j]){
+      pricing_rows.push_back(static_cast<std::size_t>(i));
+      pricing_values.push_back(value);
+    }
+  }
+  pricing_offsets[static_cast<std::size_t>(total)]=pricing_rows.size();
+
   auto simplex_phase = [&](const std::vector<Real>& c, bool phase_one,
                            std::size_t& phase_iterations)->SolveStatus {
     phase_iterations=0;
@@ -272,11 +291,10 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       for(Index j=0;j<total;++j)
         if(std::abs(c[j])>options_.dual_tolerance) ++nonzero_cost_count;
 
-      // Phase 3 pricing: convert the cached sparse standard-form columns to
-      // CSC arrays once per pricing pass and evaluate all reduced costs through
-      // the backend. On an NVIDIA build this dispatches to CUDA; on this
-      // machine it uses the validated CPU fallback. The original scalar loop
-      // remains available through PHASE3_DISABLE_GPU_PRICING for A/B testing.
+      // Phase 3 pricing reuses the immutable CSC representation built
+      // before the simplex iterations. On an NVIDIA build this dispatches to
+      // CUDA; on this machine it uses the validated CPU fallback. The original
+      // scalar loop remains available through PHASE3_DISABLE_GPU_PRICING.
       bool use_phase3_pricing=true;
 #ifdef _WIN32
       char* disable_value=nullptr;
@@ -294,23 +312,6 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       std::vector<Real> reduced_costs;
       bool backend_pricing_ok=false;
       if(use_phase3_pricing){
-        std::vector<std::size_t> pricing_offsets(total+1,0);
-        std::vector<std::size_t> pricing_rows;
-        std::vector<double> pricing_values;
-        pricing_rows.reserve([&](){
-          std::size_t nnz=0;
-          for(const auto& column_entries:sparse_columns) nnz+=column_entries.size();
-          return nnz;
-        }());
-        pricing_values.reserve(pricing_rows.capacity());
-        for(Index j=0;j<total;++j){
-          pricing_offsets[static_cast<std::size_t>(j)]=pricing_rows.size();
-          for(const auto& [i,value]:sparse_columns[j]){
-            pricing_rows.push_back(static_cast<std::size_t>(i));
-            pricing_values.push_back(value);
-          }
-        }
-        pricing_offsets[static_cast<std::size_t>(total)]=pricing_rows.size();
         backend_pricing_ok=indigenous::gpu::sparse_reduced_costs(
             pricing_offsets,pricing_rows,pricing_values,c,pi,reduced_costs);
       }

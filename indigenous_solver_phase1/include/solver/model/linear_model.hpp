@@ -15,6 +15,11 @@ struct SimplexStatistics {
   double lu_factor_load_ms=0;
   double lu_factor_pivot_ms=0;
   double lu_factor_elimination_ms=0;
+  std::size_t lu_factor_elimination_affected_rows=0;
+  std::size_t lu_factor_elimination_pivot_entries=0;
+  std::size_t lu_factor_elimination_hash_finds=0;
+  std::size_t lu_factor_elimination_hash_inserts=0;
+  std::size_t lu_factor_elimination_hash_erases=0;
   double lu_update_ms=0;
   double eta_forward_ms=0;
   double eta_transpose_ms=0;

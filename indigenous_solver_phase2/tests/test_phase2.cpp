@@ -80,7 +80,7 @@ int main(){
   LinearModel infeasible=m;
   infeasible.constraints={{"upper", -kInfinity, 1},
                           {"lower", 2, kInfinity}};
-  infeasible.A=CscMatrix(2,2,{1,1,1},{0,1,1},{0,2,4});
+  infeasible.A=CscMatrix(2,2,{1,1,1,1},{0,1,0,1},{0,2,4});
   auto ir=RevisedSimplexSolver{}.solve(infeasible);
   check(ir.status==SolveStatus::Infeasible,"Phase I infeasibility");
 

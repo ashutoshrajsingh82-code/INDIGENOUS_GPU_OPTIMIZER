@@ -75,9 +75,12 @@ int main(){
   auto gv=validate_solution(ge,gr.primal,gr.objective_value);
   check(gv.valid,">= certificate");
 
-  // Infeasible equality must be detected by Phase I rather than accepted as optimal.
+  // Infeasible but structurally valid model: x + y <= 1 and x + y >= 2.
+  // The row bounds themselves are valid; infeasibility must be detected by Phase I.
   LinearModel infeasible=m;
-  infeasible.constraints={{"impossible",3,2}};
+  infeasible.constraints={{"upper", -kInfinity, 1},
+                          {"lower", 2, kInfinity}};
+  infeasible.A=CscMatrix(2,2,{1,1,1},{0,1,1},{0,2,4});
   auto ir=RevisedSimplexSolver{}.solve(infeasible);
   check(ir.status==SolveStatus::Infeasible,"Phase I infeasibility");
 

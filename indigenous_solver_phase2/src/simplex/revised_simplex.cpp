@@ -36,6 +36,20 @@ struct StandardSystem {
 static bool nearly_equal(Real a, Real b, Real tol) {
   return std::abs(a-b) <= tol*std::max<Real>(1.0,std::max(std::abs(a),std::abs(b)));
 }
+
+static bool phase2_debug_enabled() {
+#ifdef _WIN32
+  char* value=nullptr;
+  std::size_t size=0;
+  if(_dupenv_s(&value,&size,"PHASE2_DEBUG")!=0 || value==nullptr) return false;
+  const bool enabled=value[0] && value[0]!='0';
+  std::free(value);
+  return enabled;
+#else
+  const char* value=std::getenv("PHASE2_DEBUG");
+  return value && value[0] && value[0]!='0';
+#endif
+}
 }
 
 SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {

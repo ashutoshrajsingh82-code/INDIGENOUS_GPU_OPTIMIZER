@@ -303,6 +303,23 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       }
 
       theta=std::max<Real>(0,x[sys.basis[leave]]/direction[leave]);
+
+      // Degenerate pivots (theta == 0) are common in Netlib models. Prefer
+      // the smallest basic index on a degenerate ratio tie instead of the
+      // largest pivot; this deterministic Bland-style tie-break prevents
+      // short cycling on highly degenerate bases such as bore3d.
+      if(theta<=options_.primal_tolerance){
+        Index bland_leave=-1;
+        for(Index i=0;i<M;++i) if(direction[i]>options_.pivot_tolerance){
+          const Real t=std::max<Real>(0,x[sys.basis[i]]/direction[i]);
+          if(t<=harris_upper &&
+             (bland_leave<0 || sys.basis[i]<sys.basis[bland_leave]))
+            bland_leave=i;
+        }
+        if(bland_leave>=0) leave=bland_leave;
+        theta=std::max<Real>(0,x[sys.basis[leave]]/direction[leave]);
+      }
+
       if(!phase_one && std::getenv("PHASE2_DEBUG") && theta>options_.primal_tolerance){
         std::cerr<<"[PHASE2_MOVE] iter="<<phase_iterations
                  <<" enter="<<enter
@@ -412,6 +429,42 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
     return {p2,0,{}, {},0,0,iterations,
             p2==SolveStatus::Unbounded?"Phase II found an unbounded objective.":
             "Phase II simplex failed."};
+
+  // Refine the final basic solution against the current LU factors.
+  // Sparse dropping and long degenerate sequences can leave a small basis
+  // residual even after the reduced-cost test is optimal. Iterative refinement
+  // improves the returned primal certificate without changing the basis.
+  for(int refinement=0; refinement<3; ++refinement){
+    std::vector<Real> residual(M,0);
+    Real max_residual=0, max_rhs=0;
+    for(Index i=0;i<M;++i){
+      Real lhs=0;
+      for(Index j=0;j<total;++j) lhs+=sys.A[i][j]*x[j];
+      residual[i]=lhs-sys.b[i];
+      max_residual=std::max(max_residual,std::abs(residual[i]));
+      max_rhs=std::max(max_rhs,std::abs(sys.b[i]));
+    }
+    if(max_residual<=1e-11*std::max<Real>(1.0,max_rhs)) break;
+
+    std::vector<Real> correction_rhs(M,0), correction;
+    for(Index i=0;i<M;++i) correction_rhs[i]=-residual[i];
+    if(!lu.solve(correction_rhs,correction)) break;
+
+    std::vector<Real> candidate=x;
+    bool nonnegative=true;
+    for(Index i=0;i<M;++i){
+      const Index basic=sys.basis[i];
+      candidate[basic]+=correction[i];
+      if(candidate[basic] < -options_.primal_tolerance){
+        nonnegative=false;
+        break;
+      }
+    }
+    if(!nonnegative) break;
+    for(Index i=0;i<M;++i)
+      if(candidate[sys.basis[i]]<0) candidate[sys.basis[i]]=0;
+    x.swap(candidate);
+  }
 
   std::vector<Real> primal(n,0);
   for(Index j=0;j<n;++j) primal[j]=shift[j]+std::max<Real>(0,x[j]);

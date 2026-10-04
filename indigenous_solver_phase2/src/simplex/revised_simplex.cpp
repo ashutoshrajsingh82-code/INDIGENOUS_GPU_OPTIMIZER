@@ -257,9 +257,17 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
   }
   pricing_offsets[static_cast<std::size_t>(total)]=pricing_rows.size();
 
+  indigenous::gpu::SparsePricingWorkspace pricing_workspace;
+
   auto simplex_phase = [&](const std::vector<Real>& c, bool phase_one,
                            std::size_t& phase_iterations)->SolveStatus {
     phase_iterations=0;
+    // Objective coefficients differ between Phase I and Phase II, so upload
+    // the immutable matrix plus the current phase objective once per phase.
+    if(!pricing_workspace.initialize(
+           pricing_offsets,pricing_rows,pricing_values,c))
+      return SolveStatus::NumericalFailure;
+
     for(;phase_iterations<options_.max_iterations && iterations<options_.max_iterations;
         ++phase_iterations,++iterations){
       std::vector<Real> cb(M,0);
@@ -312,8 +320,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       std::vector<Real> reduced_costs;
       bool backend_pricing_ok=false;
       if(use_phase3_pricing){
-        backend_pricing_ok=indigenous::gpu::sparse_reduced_costs(
-            pricing_offsets,pricing_rows,pricing_values,c,pi,reduced_costs);
+        backend_pricing_ok=pricing_workspace.compute(pi,reduced_costs);
       }
 
       if(backend_pricing_ok){

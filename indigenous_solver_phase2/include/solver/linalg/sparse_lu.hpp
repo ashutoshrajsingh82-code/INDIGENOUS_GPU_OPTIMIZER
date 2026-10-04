@@ -44,6 +44,7 @@ public:
   double last_factor_pivot_ms() const { return last_factor_pivot_ms_; }
   double last_factor_elimination_ms() const { return last_factor_elimination_ms_; }
   std::size_t last_factor_elimination_affected_rows() const { return last_factor_elimination_affected_rows_; }
+  std::size_t last_factor_elimination_row_scan_checks() const { return last_factor_elimination_row_scan_checks_; }
   std::size_t last_factor_elimination_pivot_entries() const { return last_factor_elimination_pivot_entries_; }
   std::size_t last_factor_elimination_hash_finds() const { return last_factor_elimination_hash_finds_; }
   std::size_t last_factor_elimination_hash_inserts() const { return last_factor_elimination_hash_inserts_; }
@@ -67,6 +68,7 @@ private:
   mutable double last_factor_pivot_ms_=0;
   mutable double last_factor_elimination_ms_=0;
   mutable std::size_t last_factor_elimination_affected_rows_=0;
+  mutable std::size_t last_factor_elimination_row_scan_checks_=0;
   mutable std::size_t last_factor_elimination_pivot_entries_=0;
   mutable std::size_t last_factor_elimination_hash_finds_=0;
   mutable std::size_t last_factor_elimination_hash_inserts_=0;

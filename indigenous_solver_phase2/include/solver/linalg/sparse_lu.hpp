@@ -22,6 +22,8 @@ public:
 
   Index size() const { return n_; }
   Real min_pivot() const { return min_pivot_; }
+  std::size_t l_nonzeros() const;
+  std::size_t u_nonzeros() const;
 
 private:
   using Row = std::unordered_map<Index, Real>;

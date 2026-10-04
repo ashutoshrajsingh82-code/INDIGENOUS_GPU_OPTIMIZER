@@ -83,7 +83,7 @@ def ensure_models(names: list[str]) -> list[Path]:
     NETLIB_DIR.mkdir(parents=True, exist_ok=True)
     models: list[Path] = []
     for name in names:
-        destination = NETLIB_DIR / name
+        destination = NETLIB_DIR / (name + ".mps")
         if destination.is_file() and destination.stat().st_size > 0:
             models.append(destination)
             continue
@@ -127,7 +127,7 @@ def main() -> int:
     if args.download:
         models = ensure_models(names)
     else:
-        models = [NETLIB_DIR / name for name in names]
+        models = [NETLIB_DIR / (name + ".mps") for name in names]
 
     if not solver.is_file():
         print(f"ERROR: solver not found: {solver}")

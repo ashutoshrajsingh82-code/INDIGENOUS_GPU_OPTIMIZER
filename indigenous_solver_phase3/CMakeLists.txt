@@ -13,6 +13,7 @@ if(CMAKE_CUDA_COMPILER)
 
   add_library(indigenous_gpu_backend
     src/gpu/vector_ops.cu
+    src/gpu/sparse_pricing.cu
   )
   target_include_directories(indigenous_gpu_backend PUBLIC include)
   set_target_properties(indigenous_gpu_backend PROPERTIES
@@ -24,6 +25,7 @@ if(CMAKE_CUDA_COMPILER)
 else()
   add_library(indigenous_gpu_backend
     src/gpu/vector_ops_cpu.cpp
+    src/gpu/sparse_pricing_cpu.cpp
   )
   target_include_directories(indigenous_gpu_backend PUBLIC include)
   message(STATUS "Phase 3 backend: CUDA unavailable, using CPU fallback")

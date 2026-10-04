@@ -215,6 +215,13 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
   std::vector<Real> x(total,0);
   for(Index i=0;i<M;++i) x[sys.basis[i]]=sys.b[i];
 
+  // Cache sparse standard-form columns for pricing and FTRAN RHS construction.
+  std::vector<std::vector<std::pair<Index,Real>>> sparse_columns(total);
+  for(Index i=0;i<M;++i)
+    for(Index j=0;j<total;++j)
+      if(sys.A[i][j]!=0) sparse_columns[j].push_back({i,sys.A[i][j]});
+  std::vector<bool> is_basic(total,false);
+  for(Index q:sys.basis) is_basic[q]=true;
   std::vector<Real> devex_weight(total,1.0);
   std::vector<Real> pi, direction;
   std::size_t iterations=0;
@@ -252,13 +259,11 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       for(Index j=0;j<total;++j)
         if(std::abs(c[j])>options_.dual_tolerance) ++nonzero_cost_count;
       for(Index j=0;j<total;++j){
-        bool basic=false;
-        for(Index q:sys.basis) if(q==j){basic=true;break;}
-        if(basic) continue;
+        if(is_basic[j]) continue;
         if(!phase_one && sys.artificial[j]) continue;
 
         Real rc=c[j];
-        for(Index i=0;i<M;++i) rc-=pi[i]*column(j,i);
+        for(const auto& [i,value] : sparse_columns[j]) rc-=pi[i]*value;
         if(!phase_one && rc>max_rc){max_rc=rc;max_rc_j=j;}
         const Real weight=options_.use_devex
             ? std::max<Real>(1.0,devex_weight[j]) : 1.0;
@@ -294,7 +299,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       }
 
       std::vector<Real> col(M,0);
-      for(Index i=0;i<M;++i) col[i]=column(enter,i);
+      for(const auto& [i,value] : sparse_columns[enter]) col[i]=value;
       {
         const auto start=std::chrono::steady_clock::now();
         if(!lu.solve(col,direction)) return SolveStatus::NumericalFailure;
@@ -388,7 +393,9 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
 
       x[enter]=theta;
       x[sys.basis[leave]]=0;
+      is_basic[sys.basis[leave]]=false;
       sys.basis[leave]=enter;
+      is_basic[enter]=true;
       ++stats.pivots;
 
       // Keep the existing LU factors and represent this column replacement
@@ -460,18 +467,18 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
     Index enter=-1;
     for(Index j=0;j<total;++j){
       if(sys.artificial[j]) continue;
-      bool is_basic=false;
-      for(Index q:sys.basis) if(q==j){is_basic=true;break;}
-      if(is_basic) continue;
+      if(is_basic[j]) continue;
       std::vector<Real> col(M,0);
-      for(Index i=0;i<M;++i) col[i]=column(j,i);
+      for(const auto& [i,value] : sparse_columns[j]) col[i]=value;
       if(!lu.solve(col,d)) return {SolveStatus::NumericalFailure,0,{}, {},0,0,iterations,"Phase I cleanup FTRAN failed."};
       if(std::abs(d[row])>options_.pivot_tolerance){ enter=j; break; }
     }
     if(enter>=0){
       x[enter]=0;
       x[basic]=0;
+      is_basic[basic]=false;
       sys.basis[row]=enter;
+      is_basic[enter]=true;
       if(!refactor()) return {SolveStatus::NumericalFailure,0,{}, {},0,0,iterations,"Phase I cleanup refactorization failed."};
     }
   }

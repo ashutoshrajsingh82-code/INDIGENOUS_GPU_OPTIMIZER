@@ -49,17 +49,18 @@ int main(){
   check(std::abs(weighted.objective_value-r.objective_value)<1e-7,
         "Devex objective agreement");
 
-  // Degenerate start: the first feasible pivot has theta = 0.
-  // The two-pass Harris test must still select a valid leaving row and
-  // continue to the correct optimum without violating feasibility.
+  // Degenerate start: x <= 0 makes the first improving x pivot have
+  // theta = 0. The second constraint still permits y to reach one.
   LinearModel deg;
   deg.name="degenerate-test"; deg.minimize=true;
   deg.variables={{"x",0,kInfinity,-1,false},{"y",0,kInfinity,-1,false}};
-  deg.constraints={{"zero",-kInfinity,0},{"x_cap",-kInfinity,1}};
-  deg.A=CscMatrix(2,2,{0,1,1,2},{0,1},{0,1,2});
+  deg.constraints={{"x_zero",-kInfinity,0},{""x_y_cap",-kInfinity,1}};
+  deg.A=CscMatrix(2,2,{1,1,1},{0,1,1},{0,2,3});
   auto dr=RevisedSimplexSolver{}.solve(deg);
   check(dr.status==SolveStatus::Optimal,"degenerate Harris optimal");
-  check(std::abs(dr.objective_value)<1e-7,"degenerate Harris objective");
+  check(std::abs(dr.objective_value+1)<1e-7,"degenerate Harris objective");
+  check(std::abs(dr.primal[0])<1e-7&&std::abs(dr.primal[1]-1)<1e-7,
+        "degenerate Harris primal");
   auto dv=validate_solution(deg,dr.primal,dr.objective_value);
   check(dv.valid,"degenerate Harris certificate");
 

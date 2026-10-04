@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import re
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -13,7 +15,29 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 BENCHMARK_DIR = ROOT / "benchmarks"
 DEFAULT_SOLVER = ROOT / "build" / "Release" / "solver_phase2_cli.exe"
-DEFAULT_HIGHS = ROOT.parent / "HiGHS" / "build" / "Release" / "bin" / "highs.exe"
+DEFAULT_HIGHS_CANDIDATES = [
+    ROOT.parent / "HiGHS" / "build" / "Release" / "bin" / "highs.exe",
+    ROOT.parent.parent / "HiGHS" / "build" / "Release" / "bin" / "highs.exe",
+]
+
+
+def find_highs() -> Path | None:
+    """Find HiGHS without requiring a machine-specific absolute path."""
+    env_highs = os.environ.get("HIGHS_EXE")
+    if env_highs:
+        candidate = Path(env_highs).expanduser()
+        if candidate.is_file():
+            return candidate
+
+    path_highs = shutil.which("highs")
+    if path_highs:
+        return Path(path_highs)
+
+    for candidate in DEFAULT_HIGHS_CANDIDATES:
+        if candidate.is_file():
+            return candidate
+
+    return None
 
 OBJECTIVE_RE = re.compile(r"^Objective:\s*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*$", re.MULTILINE)
 HIGHS_OBJECTIVE_RE = re.compile(
@@ -49,7 +73,12 @@ def extract(pattern: re.Pattern[str], text: str) -> str | None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--solver", type=Path, default=DEFAULT_SOLVER)
-    parser.add_argument("--highs", type=Path, default=DEFAULT_HIGHS)
+    parser.add_argument(
+        "--highs",
+        type=Path,
+        default=None,
+        help="Path to highs.exe. Otherwise use HIGHS_EXE, PATH, or common sibling locations.",
+    )
     parser.add_argument("--tolerance", type=float, default=1e-7)
     parser.add_argument(
         "models",
@@ -60,12 +89,14 @@ def main() -> int:
     args = parser.parse_args()
 
     solver = args.solver.expanduser()
-    highs = args.highs.expanduser()
+    highs = args.highs.expanduser() if args.highs else find_highs()
     models = [p if p.is_absolute() else ROOT / p for p in args.models]
     if not models:
         models = sorted(BENCHMARK_DIR.glob("*.lp"))
 
-    missing = [str(p) for p in (solver, highs) if not p.is_file()]
+    missing = [str(solver)] if not solver.is_file() else []
+    if highs is None or not highs.is_file():
+        missing.append("HiGHS (use --highs <path> or set HIGHS_EXE)")
     if missing:
         print("ERROR: missing executable(s):")
         for path in missing:

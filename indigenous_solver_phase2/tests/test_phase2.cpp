@@ -54,7 +54,7 @@ int main(){
   LinearModel deg;
   deg.name="degenerate-test"; deg.minimize=true;
   deg.variables={{"x",0,kInfinity,-1,false},{"y",0,kInfinity,-1,false}};
-  deg.constraints={{"x_zero",-kInfinity,0},{""x_y_cap",-kInfinity,1}};
+  deg.constraints={{"x_zero",-kInfinity,0},{"x_y_cap",-kInfinity,1}};
   deg.A=CscMatrix(2,2,{1,1,1},{0,1,1},{0,2,3});
   auto dr=RevisedSimplexSolver{}.solve(deg);
   check(dr.status==SolveStatus::Optimal,"degenerate Harris optimal");

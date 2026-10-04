@@ -155,6 +155,7 @@ bool SparseLU::factorize_sparse_columns(
       std::chrono::steady_clock::now()-load_start).count();
 
   for(Index k=0;k<n_;++k) {
+    const auto pivot_start=std::chrono::steady_clock::now();
     Index pivot=k;
     Real column_scale=0;
     Real pivot_abs=0;

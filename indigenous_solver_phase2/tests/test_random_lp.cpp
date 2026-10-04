@@ -75,7 +75,7 @@ int main() {
     model.constraints.resize(m);
     for(Index i=0;i<m;++i)
       model.constraints[i]={"r"+std::to_string(i),-kInfinity,rhs[i]};
-    model.A=CscMatrix(m,n,row_indices,values,col_ptr);
+    model.A=CscMatrix(m,n,values,row_indices,col_ptr);
 
     RevisedSimplexOptions options;
     options.max_iterations=10000;
@@ -85,7 +85,7 @@ int main() {
     check(std::abs(result.objective_value-expected)<1e-6,
           "random LP known objective");
 
-    if(result.primal.size()==n) {
+    if(static_cast<Index>(result.primal.size())==n) {
       for(Index j=0;j<n;++j)
         check(std::abs(result.primal[j]-upper[j])<1e-6,
               "random LP reaches known optimum");

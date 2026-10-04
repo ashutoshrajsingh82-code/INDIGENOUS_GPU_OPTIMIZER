@@ -43,67 +43,19 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
     }
   }
 
-  // Markowitz-style sparse pivoting with threshold partial pivoting.
-  // Prefer pivots that minimize fill-in, but reject numerically weak pivots.
-  std::vector<std::size_t> column_nnz(static_cast<std::size_t>(n_),0);
-  for(Index i=0;i<n_;++i)
-    for(const auto& [j,value] : u_[i])
-      if(std::abs(value)>drop_tol) ++column_nnz[static_cast<std::size_t>(j)];
-
-  constexpr Real markowitz_threshold=0.1;
   for(Index k=0;k<n_;++k) {
+    Index pivot=k;
     Real column_scale=0;
     for(Index i=k;i<n_;++i) {
       auto it=u_[i].find(k);
-      if(it!=u_[i].end())
+      if(it!=u_[i].end()) {
         column_scale=std::max(column_scale,std::abs(it->second));
+        if(std::abs(it->second)>std::abs(u_[pivot].count(k)?u_[pivot].at(k):0))
+          pivot=i;
+      }
     }
 
     if(column_scale<=tol_) {
-      n_=0;
-      return false;
-    }
-
-    Index pivot=-1;
-    std::size_t best_markowitz=std::numeric_limits<std::size_t>::max();
-    Real best_abs=0;
-
-    // Threshold partial pivoting: candidates must retain at least 10% of the
-    // largest magnitude in the active pivot column. Among those candidates,
-    // choose the smallest Markowitz product to control fill-in.
-    const Real threshold=markowitz_threshold*column_scale;
-    for(Index i=k;i<n_;++i) {
-      auto it=u_[i].find(k);
-      if(it==u_[i].end()) continue;
-      const Real abs_value=std::abs(it->second);
-      if(abs_value<threshold) continue;
-
-      const std::size_t row_nnz=u_[i].size();
-      const std::size_t col_nnz=column_nnz[static_cast<std::size_t>(k)];
-      const std::size_t markowitz=(row_nnz>0?row_nnz-1:0)*
-                                  (col_nnz>0?col_nnz-1:0);
-      if(pivot<0 || markowitz<best_markowitz ||
-         (markowitz==best_markowitz && abs_value>best_abs)) {
-        pivot=i;
-        best_markowitz=markowitz;
-        best_abs=abs_value;
-      }
-    }
-
-    // Fall back to the strongest available pivot if the threshold rejected
-    // every candidate. This preserves the previous partial-pivoting behavior
-    // for difficult numerical bases.
-    if(pivot<0) {
-      for(Index i=k;i<n_;++i) {
-        auto it=u_[i].find(k);
-        if(it!=u_[i].end() && (pivot<0 || std::abs(it->second)>best_abs)) {
-          pivot=i;
-          best_abs=std::abs(it->second);
-        }
-      }
-    }
-
-    if(pivot<0 || best_abs<=tol_) {
       n_=0;
       return false;
     }
@@ -131,29 +83,21 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
 
       const Real multiplier=col_it->second/pivot_value;
       u_[i].erase(col_it);
-      --column_nnz[static_cast<std::size_t>(k)];
       if(std::abs(multiplier)>drop_tol) l_[i][k]=multiplier;
 
       // U[k] is sparse; propagate only its entries after the pivot.
       for(const auto& [j, value] : u_[k]) {
         if(j<=k) continue;
-        auto existing=u_[i].find(j);
-        const bool had_entry=existing!=u_[i].end();
-        const Real updated=had_entry ? existing->second-multiplier*value
-                                     : -multiplier*value;
-        if(std::abs(updated)<=drop_tol) {
-          if(had_entry) {
-            u_[i].erase(existing);
-            --column_nnz[static_cast<std::size_t>(j)];
-          }
-        } else {
-          if(had_entry)
-            existing->second=updated;
-          else {
-            u_[i][j]=updated;
-            ++column_nnz[static_cast<std::size_t>(j)];
-          }
-        }
+        const Real updated=u_[i].count(j)?u_[i][j]-multiplier*value
+                                        :-multiplier*value;
+        if(std::abs(updated)<=drop_tol)
+          u_[i].erase(j);
+        else
+          u_[i][j]=updated;
+      }
+      for(auto it=u_[i].begin(); it!=u_[i].end(); ) {
+        if(std::abs(it->second)<=drop_tol) it=u_[i].erase(it);
+        else ++it;
       }
     }
   }

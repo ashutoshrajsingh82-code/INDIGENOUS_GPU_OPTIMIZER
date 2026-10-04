@@ -192,15 +192,23 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
     }
   }
 
+  // Cache sparse standard-form columns once. Refactorization can then
+  // consume only the nonzeros of the current basis instead of materializing
+  // a dense M-by-M basis matrix on every eta-chain reset.
+  std::vector<std::vector<std::pair<Index,Real>>> sparse_columns(total);
+  for(Index i=0;i<M;++i)
+    for(Index j=0;j<total;++j)
+      if(sys.A[i][j]!=0) sparse_columns[j].push_back({i,sys.A[i][j]});
+
   SparseLU lu;
   auto column=[&](Index j, Index i)->Real { return sys.A[i][j]; };
   auto refactor=[&](){
     const auto start=std::chrono::steady_clock::now();
-    std::vector<std::vector<Real>> B(M,std::vector<Real>(M,0));
+    std::vector<std::vector<std::pair<Index,Real>>> basis_columns(M);
     for(Index k=0;k<M;++k)
-      for(Index i=0;i<M;++i)
-        B[i][k]=column(sys.basis[k],i);
-    const bool ok=lu.factorize(B,options_.pivot_tolerance);
+      basis_columns[k]=sparse_columns[sys.basis[k]];
+    const bool ok=lu.factorize_sparse_columns(
+        basis_columns,M,options_.pivot_tolerance);
     stats.lu_factorization_ms+=elapsed_ms(start);
     ++stats.lu_factorizations;
     stats.max_lu_nonzeros=std::max(
@@ -214,12 +222,6 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
 
   std::vector<Real> x(total,0);
   for(Index i=0;i<M;++i) x[sys.basis[i]]=sys.b[i];
-
-  // Cache sparse standard-form columns for pricing and FTRAN RHS construction.
-  std::vector<std::vector<std::pair<Index,Real>>> sparse_columns(total);
-  for(Index i=0;i<M;++i)
-    for(Index j=0;j<total;++j)
-      if(sys.A[i][j]!=0) sparse_columns[j].push_back({i,sys.A[i][j]});
   std::vector<bool> is_basic(total,false);
   for(Index q:sys.basis) is_basic[q]=true;
   std::vector<Real> devex_weight(total,1.0);

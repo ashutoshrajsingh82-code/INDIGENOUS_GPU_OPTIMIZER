@@ -1,6 +1,7 @@
 #include "solver/linalg/sparse_lu.hpp"
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 #include <limits>
 #include <utility>
 
@@ -239,12 +240,15 @@ bool SparseLU::solve(const std::vector<Real>& b,
   // B_current = B_base * E_1 * ... * E_k. For an eta matrix E whose
   // replacement column is d, E*x=y gives x[r]=y[r]/d[r] and
   // x[i]=y[i]-d[i]*x[r]. Apply E_1^{-1}, then E_2^{-1}, ... in order.
+  const auto eta_start=std::chrono::steady_clock::now();
   for(const auto& eta:etas_) {
     const Real pivot_component=x[eta.pivot_row]/eta.pivot;
     for(Index i=0;i<n_;++i) if(i!=eta.pivot_row)
       x[i]-=eta.direction[i]*pivot_component;
     x[eta.pivot_row]=pivot_component;
   }
+  last_eta_forward_ms_=std::chrono::duration<double,std::milli>(
+      std::chrono::steady_clock::now()-eta_start).count();
   return true;
 }
 
@@ -259,6 +263,7 @@ bool SparseLU::solve_transpose(const std::vector<Real>& b,
   // Reuse x as the working vector for the eta, U^T, and L^T solves.
   // This avoids three temporary vector allocations/copies on every BTRAN.
   x=b;
+  const auto eta_start=std::chrono::steady_clock::now();
   for(auto it=etas_.rbegin();it!=etas_.rend();++it) {
     const auto& eta=*it;
     Real sum=0;
@@ -266,6 +271,8 @@ bool SparseLU::solve_transpose(const std::vector<Real>& b,
       sum+=eta.direction[i]*x[i];
     x[eta.pivot_row]=(x[eta.pivot_row]-sum)/eta.pivot;
   }
+  last_eta_transpose_ms_=std::chrono::duration<double,std::milli>(
+      std::chrono::steady_clock::now()-eta_start).count();
 
   // U^T*x=x. Scatter each solved component through the existing sparse row
   // entries instead of scanning all preceding columns.

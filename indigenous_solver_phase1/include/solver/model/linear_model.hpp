@@ -16,6 +16,8 @@ struct SimplexStatistics {
   double btran_ms=0;
   double pricing_ms=0;
   double pivot_ms=0;
+  double ratio_test_ms=0;
+  double basis_update_ms=0;
   std::size_t lu_factorizations=0;
   std::size_t ftran_solves=0;
   std::size_t btran_solves=0;

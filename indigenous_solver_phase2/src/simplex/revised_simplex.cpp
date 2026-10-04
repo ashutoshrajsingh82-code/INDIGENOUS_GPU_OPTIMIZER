@@ -94,7 +94,6 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
   // weight is refreshed from its FTRAN direction. This is the lightweight
   // Devex update used by this Phase 2 implementation.
   std::vector<Real> devex_weight(total,1.0);
-//
   std::vector<Real> pi, direction;
   std::size_t iter=0;
   for(;iter<options_.max_iterations;++iter){
@@ -125,19 +124,42 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
     if(!lu.solve(col,direction))
       return {SolveStatus::NumericalFailure,0,{}, {},0,0,iter,"FTRAN failed for entering column."};
 
+    // Harris two-pass ratio test. Pass 1 finds the smallest feasible
+    // step using a relaxed pivot threshold. Pass 2 chooses among all rows
+    // within the Harris tolerance, preferring the strongest pivot. This
+    // separates the feasibility bound from the numerical tie-breaking rule.
     Real theta=std::numeric_limits<Real>::infinity();
-    for(Index i=0;i<M;++i) if(direction[i]>options_.pivot_tolerance)
-      theta=std::min(theta,x[basis[i]]/direction[i]);
+    for(Index i=0;i<M;++i) if(direction[i]>options_.pivot_tolerance){
+      const Real t=x[basis[i]]/direction[i];
+      if(t>=-options_.primal_tolerance) theta=std::min(theta,std::max<Real>(0,t));
+    }
     if(!std::isfinite(theta))
       return {SolveStatus::Unbounded,0,{}, {},0,0,iter,"No limiting basic variable for the entering column."};
 
-    const Real harris=theta+options_.primal_tolerance*std::max<Real>(1,theta);
+    const Real harris_tol=options_.primal_tolerance*
+        std::max<Real>(1.0,std::abs(theta));
+    const Real harris_upper=theta+harris_tol;
+
     Index leave=-1;
+    Real best_pivot=-1;
     for(Index i=0;i<M;++i) if(direction[i]>options_.pivot_tolerance){
-      Real t=x[basis[i]]/direction[i];
-      if(t<=harris && (leave<0 || direction[i]>direction[leave])) leave=i;
+      const Real t=std::max<Real>(0,x[basis[i]]/direction[i]);
+      if(t<=harris_upper){
+        const Real pivot=direction[i];
+        if(pivot>best_pivot){
+          best_pivot=pivot;
+          leave=i;
+        }
+      }
     }
-    if(leave<0) return {SolveStatus::NumericalFailure,0,{}, {},0,0,iter,"Harris ratio test failed."};
+    if(leave<0)
+      return {SolveStatus::NumericalFailure,0,{}, {},0,0,iter,
+              "Harris two-pass ratio test failed."};
+
+    // Recompute the actual step from the selected leaving row. A Harris
+    // candidate may be slightly above the minimum ratio within tolerance;
+    // using its exact ratio preserves primal feasibility after the pivot.
+    theta=std::max<Real>(0,x[basis[leave]]/direction[leave]);
 
     for(Index i=0;i<M;++i) if(i!=leave) x[basis[i]]-=theta*direction[i];
 

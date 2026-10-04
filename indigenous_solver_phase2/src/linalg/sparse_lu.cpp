@@ -98,13 +98,16 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
         auto existing=u_[i].find(j);
         if(existing==u_[i].end()) {
           const Real updated=-multiplier*value;
-          if(std::abs(updated)>drop_tol)
+          if(std::abs(updated)>drop_tol) {
             u_[i][j]=updated;
+            ++last_factor_elimination_hash_inserts_;
+          }
         } else {
           const Real updated=existing->second-multiplier*value;
-          if(std::abs(updated)<=drop_tol)
+          if(std::abs(updated)<=drop_tol) {
             u_[i].erase(existing);
-          else
+            ++last_factor_elimination_hash_erases_;
+          } else
             existing->second=updated;
         }
       }
@@ -129,6 +132,11 @@ bool SparseLU::factorize_sparse_columns(
   last_factor_load_ms_=0;
   last_factor_pivot_ms_=0;
   last_factor_elimination_ms_=0;
+  last_factor_elimination_affected_rows_=0;
+  last_factor_elimination_pivot_entries_=0;
+  last_factor_elimination_hash_finds_=0;
+  last_factor_elimination_hash_inserts_=0;
+  last_factor_elimination_hash_erases_=0;
 
   if(n_==0 || static_cast<Index>(columns.size())!=n_) {
     n_=0;
@@ -202,13 +210,17 @@ bool SparseLU::factorize_sparse_columns(
 
     for(Index i=k+1;i<n_;++i) {
       auto col_it=u_[i].find(k);
+      ++last_factor_elimination_hash_finds_;
       if(col_it==u_[i].end()) continue;
+      ++last_factor_elimination_affected_rows_;
       const Real multiplier=col_it->second/pivot_value;
       u_[i].erase(col_it);
       if(std::abs(multiplier)>drop_tol) l_[i][k]=multiplier;
 
       for(const auto& [j,value] : pivot_entries) {
+        ++last_factor_elimination_pivot_entries_;
         auto existing=u_[i].find(j);
+        ++last_factor_elimination_hash_finds_;
         if(existing==u_[i].end()) {
           const Real updated=-multiplier*value;
           if(std::abs(updated)>drop_tol)

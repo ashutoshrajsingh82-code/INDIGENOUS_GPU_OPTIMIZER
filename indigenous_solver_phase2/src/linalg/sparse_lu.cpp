@@ -5,17 +5,6 @@
 #include <utility>
 
 namespace solver {
-namespace {
-constexpr Real kDropFactor = 1.0;
-
-inline void drop_small(SparseLU::Row& row, Real threshold) {
-  for (auto it=row.begin(); it!=row.end(); ) {
-    if (std::abs(it->second) <= threshold) it=row.erase(it);
-    else ++it;
-  }
-}
-}
-
 bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
   n_=static_cast<Index>(a.size());
   tol_=std::max<Real>(tol, 0);
@@ -92,7 +81,10 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
         else
           u_[i][j]=updated;
       }
-      drop_small(u_[i],tol_);
+      for(auto it=u_[i].begin(); it!=u_[i].end(); ) {
+        if(std::abs(it->second)<=tol_) it=u_[i].erase(it);
+        else ++it;
+      }
     }
   }
 
@@ -143,9 +135,11 @@ bool SparseLU::solve_transpose(const std::vector<Real>& b,
   }
 
   std::vector<Real> z=y;
-  for(Index ii=n_; ii-->0; ) {
-    for(const auto& [j,value] : l_[ii])
-      if(j>ii) z[ii]-=value*z[j];
+  for(Index i=n_; i-->0; ) {
+    for(Index j=i+1;j<n_;++j) {
+      auto it=l_[j].find(i);
+      if(it!=l_[j].end()) z[i]-=it->second*z[j];
+    }
   }
 
   x.assign(n_,0);

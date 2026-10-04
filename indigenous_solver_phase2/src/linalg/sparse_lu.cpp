@@ -46,6 +46,7 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
   }
 
   for(Index k=0;k<n_;++k) {
+    const auto pivot_start=std::chrono::steady_clock::now();
     Index pivot=k;
     Real column_scale=0;
     Real pivot_abs=0;
@@ -125,6 +126,9 @@ bool SparseLU::factorize_sparse_columns(
   u_.clear();
   perm_.clear();
   etas_.clear();
+  last_factor_load_ms_=0;
+  last_factor_pivot_ms_=0;
+  last_factor_elimination_ms_=0;
 
   if(n_==0 || static_cast<Index>(columns.size())!=n_) {
     n_=0;
@@ -136,6 +140,7 @@ bool SparseLU::factorize_sparse_columns(
 
   // Populate U directly from the sparse basis columns. Unlike the dense
   // factorize() path, this avoids scanning every zero in the basis matrix.
+  const auto load_start=std::chrono::steady_clock::now();
   for(Index j=0;j<n_;++j) {
     for(const auto& [i,value] : columns[j]) {
       if(i>=n_) {
@@ -146,6 +151,8 @@ bool SparseLU::factorize_sparse_columns(
     }
   }
   for(Index i=0;i<n_;++i) perm_[i]=i;
+  last_factor_load_ms_=std::chrono::duration<double,std::milli>(
+      std::chrono::steady_clock::now()-load_start).count();
 
   for(Index k=0;k<n_;++k) {
     Index pivot=k;
@@ -166,6 +173,9 @@ bool SparseLU::factorize_sparse_columns(
       n_=0;
       return false;
     }
+    last_factor_pivot_ms_+=std::chrono::duration<double,std::milli>(
+        std::chrono::steady_clock::now()-pivot_start).count();
+
     if(pivot!=k) {
       std::swap(u_[pivot],u_[k]);
       std::swap(l_[pivot],l_[k]);
@@ -179,6 +189,7 @@ bool SparseLU::factorize_sparse_columns(
     }
     const Real pivot_value=diag_it->second;
     min_pivot_=std::min(min_pivot_,std::abs(pivot_value));
+    const auto elimination_start=std::chrono::steady_clock::now();
     for(Index i=k+1;i<n_;++i) {
       auto col_it=u_[i].find(k);
       if(col_it==u_[i].end()) continue;
@@ -195,6 +206,8 @@ bool SparseLU::factorize_sparse_columns(
           u_[i][j]=updated;
       }
     }
+    last_factor_elimination_ms_+=std::chrono::duration<double,std::milli>(
+        std::chrono::steady_clock::now()-elimination_start).count();
   }
   return std::isfinite(min_pivot_);
 }

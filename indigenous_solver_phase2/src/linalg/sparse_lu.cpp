@@ -94,12 +94,18 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
       // U[k] is sparse; propagate only its entries after the pivot.
       for(const auto& [j, value] : u_[k]) {
         if(j<=k) continue;
-        const Real updated=u_[i].count(j)?u_[i][j]-multiplier*value
-                                        :-multiplier*value;
-        if(std::abs(updated)<=drop_tol)
-          u_[i].erase(j);
-        else
-          u_[i][j]=updated;
+        auto existing=u_[i].find(j);
+        if(existing==u_[i].end()) {
+          const Real updated=-multiplier*value;
+          if(std::abs(updated)>drop_tol)
+            u_[i][j]=updated;
+        } else {
+          const Real updated=existing->second-multiplier*value;
+          if(std::abs(updated)<=drop_tol)
+            u_[i].erase(existing);
+          else
+            existing->second=updated;
+        }
       }
     }
   }

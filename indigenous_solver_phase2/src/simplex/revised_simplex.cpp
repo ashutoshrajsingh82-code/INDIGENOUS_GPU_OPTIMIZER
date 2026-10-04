@@ -239,6 +239,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
         const auto start=std::chrono::steady_clock::now();
         if(!lu.solve_transpose(cb,pi)) return SolveStatus::NumericalFailure;
         stats.btran_ms+=elapsed_ms(start);
+        stats.eta_transpose_ms+=lu.last_eta_transpose_ms();
         ++stats.btran_solves;
       }
       if(!phase_one && kPhase2Debug && phase_iterations<3){
@@ -306,6 +307,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
         const auto start=std::chrono::steady_clock::now();
         if(!lu.solve(col,direction)) return SolveStatus::NumericalFailure;
         stats.ftran_ms+=elapsed_ms(start);
+        stats.eta_forward_ms+=lu.last_eta_forward_ms();
         ++stats.ftran_solves;
       }
       if(!phase_one && kPhase2Debug && phase_iterations<3){

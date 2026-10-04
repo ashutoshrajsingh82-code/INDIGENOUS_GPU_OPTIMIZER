@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <cmath>
 #include <chrono>
-#include <cstdint>
 #include <limits>
 #include <utility>
 
@@ -209,12 +208,6 @@ bool SparseLU::factorize_sparse_columns(
     for(const auto& [j,value] : u_[k])
       if(j>k) pivot_entries.push_back({j,value});
 
-    // Reuse one dense row-position workspace across affected rows.
-    // Stamps avoid clearing O(n) marker arrays for every row, while pointers
-    // let the hot loop update unordered_map values without another lookup.
-    std::vector<std::uint32_t> row_stamp(n_,0);
-    std::vector<Real*> row_ptr(n_,nullptr);
-    std::uint32_t row_token=0;
     for(Index i=k+1;i<n_;++i) {
       auto col_it=u_[i].find(k);
       ++last_factor_elimination_hash_finds_;
@@ -224,38 +217,20 @@ bool SparseLU::factorize_sparse_columns(
       u_[i].erase(col_it);
       if(std::abs(multiplier)>drop_tol) l_[i][k]=multiplier;
 
-      ++row_token;
-      if(row_token==0) {
-        std::fill(row_stamp.begin(),row_stamp.end(),0);
-        row_token=1;
-      }
-      for(auto& entry : u_[i]) {
-        const Index j=entry.first;
-        row_stamp[j]=row_token;
-        row_ptr[j]=&entry.second;
-      }
-
       for(const auto& [j,value] : pivot_entries) {
         ++last_factor_elimination_pivot_entries_;
-        if(row_stamp[j]==row_token) {
-          Real* entry=row_ptr[j];
-          const Real updated=*entry-multiplier*value;
-          if(std::abs(updated)<=drop_tol) {
-            u_[i].erase(j);
-            row_stamp[j]=0;
-            ++last_factor_elimination_hash_erases_;
-          } else {
-            *entry=updated;
-          }
-        } else {
+        auto existing=u_[i].find(j);
+        ++last_factor_elimination_hash_finds_;
+        if(existing==u_[i].end()) {
           const Real updated=-multiplier*value;
-          if(std::abs(updated)>drop_tol) {
-            auto [it,inserted]=u_[i].emplace(j,updated);
-            (void)inserted;
-            row_stamp[j]=row_token;
-            row_ptr[j]=&it->second;
-            ++last_factor_elimination_hash_inserts_;
-          }
+          if(std::abs(updated)>drop_tol)
+            u_[i][j]=updated;
+        } else {
+          const Real updated=existing->second-multiplier*value;
+          if(std::abs(updated)<=drop_tol)
+            u_[i].erase(existing);
+          else
+            existing->second=updated;
         }
       }
     }

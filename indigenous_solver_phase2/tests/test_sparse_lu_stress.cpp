@@ -170,9 +170,9 @@ int main() {
     check(lu.update_count()==2,"eta update count");
 
     const std::vector<std::vector<Real>> updated{
-      {1,0,0},
-      {2,3,4},
-      {1,-2,5}
+      {1,2,1},
+      {0,3,-2},
+      {0,4,5}
     };
     const std::vector<Real> expected{1.5,-0.5,2.0};
     const auto b=multiply(updated,expected);

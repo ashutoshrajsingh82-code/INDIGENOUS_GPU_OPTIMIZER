@@ -43,6 +43,11 @@ public:
   double last_factor_load_ms() const { return last_factor_load_ms_; }
   double last_factor_pivot_ms() const { return last_factor_pivot_ms_; }
   double last_factor_elimination_ms() const { return last_factor_elimination_ms_; }
+  std::size_t last_factor_elimination_affected_rows() const { return last_factor_elimination_affected_rows_; }
+  std::size_t last_factor_elimination_pivot_entries() const { return last_factor_elimination_pivot_entries_; }
+  std::size_t last_factor_elimination_hash_finds() const { return last_factor_elimination_hash_finds_; }
+  std::size_t last_factor_elimination_hash_inserts() const { return last_factor_elimination_hash_inserts_; }
+  std::size_t last_factor_elimination_hash_erases() const { return last_factor_elimination_hash_erases_; }
 
 private:
   using Row = std::unordered_map<Index, Real>;
@@ -61,6 +66,11 @@ private:
   mutable double last_factor_load_ms_=0;
   mutable double last_factor_pivot_ms_=0;
   mutable double last_factor_elimination_ms_=0;
+  mutable std::size_t last_factor_elimination_affected_rows_=0;
+  mutable std::size_t last_factor_elimination_pivot_entries_=0;
+  mutable std::size_t last_factor_elimination_hash_finds_=0;
+  mutable std::size_t last_factor_elimination_hash_inserts_=0;
+  mutable std::size_t last_factor_elimination_hash_erases_=0;
 
   // After factorization: P*A = L*U.
   std::vector<Row> l_;

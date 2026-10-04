@@ -26,6 +26,7 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
   l_.clear();
   u_.clear();
   perm_.clear();
+  etas_.clear();
 
   if (n_==0) return false;
   u_.resize(n_);
@@ -105,6 +106,25 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
   return std::isfinite(min_pivot_);
 }
 
+bool SparseLU::update(const std::vector<Real>& direction,
+                     Index leaving_row, Real pivot_tolerance) {
+  if(n_==0 || static_cast<Index>(direction.size())!=n_ || leaving_row>=n_)
+    return false;
+
+  const Real pivot=direction[leaving_row];
+  if(!std::isfinite(pivot) ||
+     std::abs(pivot)<=pivot_tolerance*std::max<Real>(1.0,
+                                                     std::abs(pivot)))
+    return false;
+
+  EtaUpdate eta;
+  eta.pivot_row=leaving_row;
+  eta.pivot=pivot;
+  eta.direction=direction;
+  etas_.push_back(std::move(eta));
+  return true;
+}
+
 bool SparseLU::solve(const std::vector<Real>& b,
                      std::vector<Real>& x) const {
   if(n_==0 || static_cast<Index>(b.size())!=n_) return false;
@@ -127,6 +147,15 @@ bool SparseLU::solve(const std::vector<Real>& b,
     auto diag=u_[ii].find(ii);
     if(diag==u_[ii].end() || std::abs(diag->second)<=tol_) return false;
     x[ii]=rhs/diag->second;
+  }
+
+  // B_current = B_base * E_1 * ... * E_k. Apply the eta transforms in
+  // chronological order to obtain E_k^{-1}...E_1^{-1} U^{-1}L^{-1}P b.
+  for(const auto& eta:etas_) {
+    Real sum=0;
+    for(Index i=0;i<n_;++i) if(i!=eta.pivot_row)
+      sum+=eta.direction[i]*x[i];
+    x[eta.pivot_row]=(x[eta.pivot_row]-sum)/eta.pivot;
   }
   return true;
 }
@@ -158,6 +187,17 @@ bool SparseLU::solve_transpose(const std::vector<Real>& b,
 
   x.assign(n_,0);
   for(Index i=0;i<n_;++i) x[perm_[i]]=z[i];
+
+  // For B_current^T = E_k^T ... E_1^T B_base^T, solve each E_i^T
+  // in reverse order before the base transpose solve. The transformed
+  // right-hand side is returned in x.
+  for(auto it=etas_.rbegin();it!=etas_.rend();++it) {
+    const auto& eta=*it;
+    Real sum=0;
+    for(Index i=0;i<n_;++i) if(i!=eta.pivot_row)
+      sum+=eta.direction[i]*x[i];
+    x[eta.pivot_row]=(x[eta.pivot_row]-sum)/eta.pivot;
+  }
   return true;
 }
 

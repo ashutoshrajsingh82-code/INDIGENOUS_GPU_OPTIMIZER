@@ -76,7 +76,7 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
         if(j<=k) continue;
         const Real updated=u_[i].count(j)?u_[i][j]-multiplier*value
                                         :-multiplier*value;
-        if(std::abs(updated)<=tol_*kDropFactor)
+        if(std::abs(updated)<=tol_)
           u_[i].erase(j);
         else
           u_[i][j]=updated;

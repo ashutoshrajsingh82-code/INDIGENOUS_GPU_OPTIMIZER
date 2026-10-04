@@ -127,12 +127,12 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
 
   Index total=n;
   for(Index i=0;i<M;++i){
-    if(kind[i]==0){
+    if(rows[i].sense<0){
       ++total; // slack
-    } else if(kind[i]==1){
-      ++total; // artificial
-    } else {
+    } else if(rows[i].sense>0){
       ++total; ++total; // surplus + artificial
+    } else {
+      ++total; // artificial
     }
   }
   if(M==0){

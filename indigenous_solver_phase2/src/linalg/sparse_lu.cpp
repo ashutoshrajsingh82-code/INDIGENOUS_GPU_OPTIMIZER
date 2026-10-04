@@ -215,18 +215,19 @@ bool SparseLU::solve(const std::vector<Real>& b,
                      std::vector<Real>& x) const {
   if(n_==0 || static_cast<Index>(b.size())!=n_) return false;
 
-  // P*b = L*y.
-  std::vector<Real> y(n_,0);
+  // Reuse one working vector for P*b, forward substitution, and back
+  // substitution. This avoids allocating/copying separate y and x vectors
+  // on every FTRAN.
+  x.resize(n_);
   for(Index i=0;i<n_;++i) {
-    y[i]=b[perm_[i]];
+    x[i]=b[perm_[i]];
     for(const auto& [j,value] : l_[i])
-      if(j<i) y[i]-=value*y[j];
+      if(j<i) x[i]-=value*x[j];
   }
 
   // U*x=y.
-  x.assign(n_,0);
   for(Index ii=n_; ii-->0; ) {
-    Real rhs=y[ii];
+    Real rhs=x[ii];
     for(const auto& [j,value] : u_[ii])
       if(j>ii) rhs-=value*x[j];
 
@@ -255,40 +256,38 @@ bool SparseLU::solve_transpose(const std::vector<Real>& b,
   // U^T*y=b, L^T*z=y, P*x=z.
   // B_current^T = E_k^T ... E_1^T B_base^T. Solve the eta system first,
   // in reverse update order, then solve the base transpose factors.
-  std::vector<Real> transformed=b;
+  // Reuse x as the working vector for the eta, U^T, and L^T solves.
+  // This avoids three temporary vector allocations/copies on every BTRAN.
+  x=b;
   for(auto it=etas_.rbegin();it!=etas_.rend();++it) {
     const auto& eta=*it;
     Real sum=0;
     for(Index i=0;i<n_;++i) if(i!=eta.pivot_row)
-      sum+=eta.direction[i]*transformed[i];
-    transformed[eta.pivot_row]=(transformed[eta.pivot_row]-sum)/eta.pivot;
+      sum+=eta.direction[i]*x[i];
+    x[eta.pivot_row]=(x[eta.pivot_row]-sum)/eta.pivot;
   }
 
-  // U^T*y=transformed. Scatter each solved component through the
-  // existing sparse row entries instead of scanning all preceding columns.
-  // This changes the transpose solve from dense O(n^2) hash lookups to
-  // work proportional to the stored U nonzeros.
-  std::vector<Real> y=transformed;
+  // U^T*x=x. Scatter each solved component through the existing sparse row
+  // entries instead of scanning all preceding columns.
   for(Index i=0;i<n_;++i) {
     auto diag=u_[i].find(i);
     if(diag==u_[i].end() || std::abs(diag->second)<=tol_) return false;
-    y[i]/=diag->second;
+    x[i]/=diag->second;
     for(const auto& [j,value] : u_[i]) {
-      if(j>i) y[j]-=value*y[i];
+      if(j>i) x[j]-=value*x[i];
     }
   }
 
-  // L has an implicit unit diagonal. Solve L^T*z=y by processing rows
-  // backwards and scattering each solved value into earlier columns.
-  std::vector<Real> z=y;
+  // L^T*x=x. L has an implicit unit diagonal.
   for(Index i=n_; i-->0; ) {
     for(const auto& [j,value] : l_[i]) {
-      if(j<i) z[j]-=value*z[i];
+      if(j<i) x[j]-=value*x[i];
     }
   }
 
-  x.assign(n_,0);
-  for(Index i=0;i<n_;++i) x[perm_[i]]=z[i];
+  // Undo the row permutation.
+  std::vector<Real> permuted=x;
+  for(Index i=0;i<n_;++i) x[perm_[i]]=permuted[i];
   return true;
 }
 

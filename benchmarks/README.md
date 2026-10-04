@@ -25,3 +25,27 @@ python run_benchmarks.py
 The benchmark runner automatically searches for HiGHS using `HIGHS_EXE`, the system PATH, and common sibling build locations.
 
 Use `--solver` or `--highs` to override executable locations, and `--tolerance` to change the objective comparison tolerance.
+
+## Netlib validation subset
+
+The repository also contains a curated manifest at `benchmarks/netlib/manifest.txt`. The model files are intentionally not committed; the harness downloads them from the Netlib LP data repository when requested. Netlib is the source repository for these public mathematical optimization data files. urlNetlib LP data repositoryhttps://www.netlib.org/lp/data/
+
+From the repository root, download the subset and compare it against HiGHS:
+
+```bat
+python run_netlib_benchmarks.py --download
+```
+
+To run only models that have already been downloaded:
+
+```bat
+python run_netlib_benchmarks.py
+```
+
+To run selected models from the manifest:
+
+```bat
+python run_netlib_benchmarks.py --download afiro adlittle blend
+```
+
+The harness requires the Phase 2 CLI to report `OPTIMAL` with a passing certificate and requires its objective to agree with HiGHS within the configured tolerance. A model that the current Phase 2 implementation cannot parse or solve is reported as a failure rather than silently omitted.

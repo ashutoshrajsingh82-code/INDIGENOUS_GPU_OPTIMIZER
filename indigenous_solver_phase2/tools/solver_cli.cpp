@@ -18,6 +18,6 @@ int main(int argc,char**argv){
   auto r=RevisedSimplexSolver{o}.solve(m);
   std::cout<<"Status: "<<to_string(r.status)<<"\nObjective: "<<std::setprecision(12)<<r.objective_value
            <<"\nIterations: "<<r.iterations<<"\nPrimal residual: "<<r.primal_residual<<"\n"<<r.message<<"\n";
-  if(!r.primal.empty()){auto v=validate_solution(m,r.primal,r.objective_value);std::cout<<"Certificate: "<<(v.valid?"PASS":"FAIL")<<"\n";for(size_t i=0;i<r.primal.size();++i)std::cout<<"  "<<m.variables[i].name<<" = "<<std::setprecision(12)<<r.primal[i]<<"\n";}
+  if(!r.primal.empty()){auto v=validate_solution(m,r.primal,r.objective_value);std::cout<<"Certificate: "<<(v.valid?"PASS":"FAIL")<<"\n"<<"Certificate max primal violation: "<<std::setprecision(12)<<v.max_primal_violation<<"\n"<<"Certificate objective difference: "<<std::setprecision(12)<<v.objective_difference<<"\n"<<v.message<<"\n";for(size_t i=0;i<r.primal.size();++i)std::cout<<"  "<<m.variables[i].name<<" = "<<std::setprecision(12)<<r.primal[i]<<"\n";}
   return r.status==SolveStatus::Optimal?0:1;
 }

@@ -178,22 +178,26 @@ bool SparseLU::solve_transpose(const std::vector<Real>& b,
     transformed[eta.pivot_row]=(transformed[eta.pivot_row]-sum)/eta.pivot;
   }
 
+  // U^T*y=transformed. Scatter each solved component through the
+  // existing sparse row entries instead of scanning all preceding columns.
+  // This changes the transpose solve from dense O(n^2) hash lookups to
+  // work proportional to the stored U nonzeros.
   std::vector<Real> y=transformed;
   for(Index i=0;i<n_;++i) {
     auto diag=u_[i].find(i);
     if(diag==u_[i].end() || std::abs(diag->second)<=tol_) return false;
-    for(Index j=0;j<i;++j) {
-      auto it=u_[j].find(i);
-      if(it!=u_[j].end()) y[i]-=it->second*y[j];
-    }
     y[i]/=diag->second;
+    for(const auto& [j,value] : u_[i]) {
+      if(j>i) y[j]-=value*y[i];
+    }
   }
 
+  // L has an implicit unit diagonal. Solve L^T*z=y by processing rows
+  // backwards and scattering each solved value into earlier columns.
   std::vector<Real> z=y;
   for(Index i=n_; i-->0; ) {
-    for(Index j=i+1;j<n_;++j) {
-      auto it=l_[j].find(i);
-      if(it!=l_[j].end()) z[i]-=it->second*z[j];
+    for(const auto& [j,value] : l_[i]) {
+      if(j<i) z[j]-=value*z[i];
     }
   }
 

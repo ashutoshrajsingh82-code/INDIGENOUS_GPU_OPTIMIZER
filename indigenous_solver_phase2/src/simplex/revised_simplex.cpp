@@ -14,11 +14,21 @@
 namespace solver {
 namespace {
 constexpr Real kEqTol=1e-10;
-const bool kPhase2Debug = []{
-  const char* value=kPhase2Debug;
+static bool phase2_debug_enabled() {
+#ifdef _WIN32
+  char* value=nullptr;
+  std::size_t size=0;
+  if(_dupenv_s(&value,&size,"PHASE2_DEBUG")!=0 || value==nullptr) return false;
+  const bool enabled=value[0] && value[0]!='0';
+  std::free(value);
+  return enabled;
+#else
+  const char* value=std::getenv("PHASE2_DEBUG");
   return value && value[0] && value[0]!='0';
-}();
+#endif
+}
 
+const bool kPhase2Debug = phase2_debug_enabled();
 
 struct StandardRow {
   std::vector<Real> a;
@@ -431,7 +441,7 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
              <<" max_basic="<<max_basic
              <<" positive_basic="<<positive_basic<<"\\n";
   }
-  if(artificial_sum>options_.primal_tolerance*std::max<Real>(1.0,M)){
+  if(artificial_sum>options_.primal_tolerance*std::max<Real>(1.0,static_cast<Real>(M))){
     return {SolveStatus::Infeasible,0,{}, {},artificial_sum,0,iterations,
             "Phase I optimum is positive; model is infeasible."};
   }

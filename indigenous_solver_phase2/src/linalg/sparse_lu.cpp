@@ -48,16 +48,16 @@ bool SparseLU::factorize(const std::vector<std::vector<Real>>& a, Real tol) {
   for(Index k=0;k<n_;++k) {
     Index pivot=k;
     Real column_scale=0;
+    Real pivot_abs=0;
     for(Index i=k;i<n_;++i) {
       auto it=u_[i].find(k);
       if(it!=u_[i].end()) {
-        column_scale=std::max(column_scale,std::abs(it->second));
-        const Real current_pivot = [&]() {
-          auto current = u_[pivot].find(k);
-          return current==u_[pivot].end() ? Real(0) : current->second;
-        }();
-        if(std::abs(it->second)>std::abs(current_pivot))
+        const Real candidate_abs=std::abs(it->second);
+        column_scale=std::max(column_scale,candidate_abs);
+        if(candidate_abs>pivot_abs) {
           pivot=i;
+          pivot_abs=candidate_abs;
+        }
       }
     }
 
@@ -150,16 +150,16 @@ bool SparseLU::factorize_sparse_columns(
   for(Index k=0;k<n_;++k) {
     Index pivot=k;
     Real column_scale=0;
+    Real pivot_abs=0;
     for(Index i=k;i<n_;++i) {
       auto it=u_[i].find(k);
       if(it!=u_[i].end()) {
-        column_scale=std::max(column_scale,std::abs(it->second));
-        const Real current_pivot = [&]() {
-          auto current = u_[pivot].find(k);
-          return current==u_[pivot].end() ? Real(0) : current->second;
-        }();
-        if(std::abs(it->second)>std::abs(current_pivot))
+        const Real candidate_abs=std::abs(it->second);
+        column_scale=std::max(column_scale,candidate_abs);
+        if(candidate_abs>pivot_abs) {
           pivot=i;
+          pivot_abs=candidate_abs;
+        }
       }
     }
     if(column_scale<=tol_) {

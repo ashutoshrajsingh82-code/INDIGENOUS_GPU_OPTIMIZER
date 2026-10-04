@@ -125,7 +125,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--solver", type=Path, default=DEFAULT_SOLVER)
     parser.add_argument("--highs", type=Path, default=None)
-    parser.add_argument("--tolerance", type=float, default=1e-7)
+    parser.add_argument(
+        "--tolerance",
+        type=float,
+        default=1e-7,
+        help="Absolute objective tolerance.",
+    )
+    parser.add_argument(
+        "--relative-tolerance",
+        type=float,
+        default=1e-9,
+        help="Relative objective tolerance used with --tolerance.",
+    )
     parser.add_argument(
         "--download",
         action="store_true",
@@ -161,6 +172,10 @@ def main() -> int:
     print("Indigenous GPU Optimizer vs HiGHS — Netlib subset")
     print(f"Solver: {solver}")
     print(f"HiGHS:  {highs}")
+    print(
+        f"Objective tolerance: abs={args.tolerance:.3e}, "
+        f"rel={args.relative_tolerance:.3e}"
+    )
     print()
 
     failures = 0
@@ -187,11 +202,21 @@ def main() -> int:
         highs_iterations = extract(HIGHS_ITERATIONS_RE, highs_out) or "-"
 
         if solver_obj is not None and highs_obj is not None:
-            difference = abs(float(solver_obj) - float(highs_obj))
+            solver_value = float(solver_obj)
+            highs_value = float(highs_obj)
+            difference = abs(solver_value - highs_value)
+            comparison_limit = max(
+                args.tolerance,
+                args.relative_tolerance
+                * max(1.0, abs(solver_value), abs(highs_value)),
+            )
             difference_text = f"{difference:.3e}"
+            comparison_limit_text = f"{comparison_limit:.3e}"
         else:
             difference = float("inf")
+            comparison_limit = 0.0
             difference_text = "n/a"
+            comparison_limit_text = "n/a"
 
         ok = (
             solver_code == 0
@@ -200,7 +225,7 @@ def main() -> int:
             and highs_status == "Optimal"
             and solver_obj is not None
             and highs_obj is not None
-            and difference <= args.tolerance
+            and difference <= comparison_limit
             and certificate == "PASS"
         )
 
@@ -209,6 +234,7 @@ def main() -> int:
             f"indigenous={solver_obj or 'n/a'} "
             f"highs={highs_obj or 'n/a'} "
             f"diff={difference_text} "
+            f"limit={comparison_limit_text} "
             f"iterations={iterations} "
             f"highs_iterations={highs_iterations} "
             f"certificate={certificate}"

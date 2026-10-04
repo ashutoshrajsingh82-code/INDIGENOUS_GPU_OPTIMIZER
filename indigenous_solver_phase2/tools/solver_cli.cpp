@@ -20,6 +20,8 @@ int main(int argc,char**argv){
   std::cout<<"Timing total_ms: "<<std::setprecision(6)<<s.total_ms<<"\n"
            <<"Timing LU_factorization_ms: "<<s.lu_factorization_ms<<"\n"
            <<"Timing LU_update_ms: "<<s.lu_update_ms<<"\n"
+           <<"Timing eta_forward_ms: "<<s.eta_forward_ms<<"\n"
+           <<"Timing eta_transpose_ms: "<<s.eta_transpose_ms<<"\n"
            <<"Timing BTRAN_ms: "<<s.btran_ms<<"\n"
            <<"Timing FTRAN_ms: "<<s.ftran_ms<<"\n"
            <<"Timing pricing_ms: "<<s.pricing_ms<<"\n"

@@ -187,9 +187,13 @@ bool SparsePricingWorkspace::compute(
   // the unavoidable dependency boundary. The stream still keeps all GPU work
   // ordered and prepares the backend for future overlap with independent work.
   if(cudaStreamSynchronize(impl_->stream)!=cudaSuccess) return false;
-  if(cudaEventElapsedTime(reinterpret_cast<float*>(&impl_->host_to_device_ms),impl_->h2d_start,impl_->h2d_end)!=cudaSuccess) return false;
-  if(cudaEventElapsedTime(reinterpret_cast<float*>(&impl_->kernel_ms),impl_->kernel_start,impl_->kernel_end)!=cudaSuccess) return false;
-  if(cudaEventElapsedTime(reinterpret_cast<float*>(&impl_->device_to_host_ms),impl_->d2h_start,impl_->d2h_end)!=cudaSuccess) return false;
+  float h2d_ms=0, kernel_ms=0, d2h_ms=0;
+  if(cudaEventElapsedTime(&h2d_ms,impl_->h2d_start,impl_->h2d_end)!=cudaSuccess) return false;
+  if(cudaEventElapsedTime(&kernel_ms,impl_->kernel_start,impl_->kernel_end)!=cudaSuccess) return false;
+  if(cudaEventElapsedTime(&d2h_ms,impl_->d2h_start,impl_->d2h_end)!=cudaSuccess) return false;
+  impl_->host_to_device_ms=h2d_ms;
+  impl_->kernel_ms=kernel_ms;
+  impl_->device_to_host_ms=d2h_ms;
   impl_->compute_ms=std::chrono::duration<double,std::milli>(
       std::chrono::steady_clock::now()-compute_start).count();
   return true;

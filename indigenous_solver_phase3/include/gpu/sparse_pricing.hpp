@@ -40,6 +40,9 @@ public:
 
   bool valid() const noexcept;
 
+  double last_initialize_ms() const noexcept;
+  double last_compute_ms() const noexcept;
+
 private:
   struct Impl;
   Impl* impl_=nullptr;

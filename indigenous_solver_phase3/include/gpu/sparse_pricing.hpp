@@ -42,6 +42,9 @@ public:
 
   double last_initialize_ms() const noexcept;
   double last_compute_ms() const noexcept;
+  double last_host_to_device_ms() const noexcept;
+  double last_kernel_ms() const noexcept;
+  double last_device_to_host_ms() const noexcept;
 
 private:
   struct Impl;

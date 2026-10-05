@@ -70,6 +70,9 @@ add_executable(indigenous_cuda_pricing_benchmark
   tests/cuda_pricing_benchmark.cpp
 )
 target_link_libraries(indigenous_cuda_pricing_benchmark PRIVATE indigenous_gpu_backend)
+if(CMAKE_CUDA_COMPILER)
+  target_compile_definitions(indigenous_cuda_pricing_benchmark PRIVATE INDIGENOUS_PHASE3_CUDA=1)
+endif()
 
 enable_testing()
 add_test(NAME indigenous_gpu_smoke_test COMMAND indigenous_gpu_smoke_test)

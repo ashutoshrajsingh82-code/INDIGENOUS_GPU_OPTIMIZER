@@ -1,5 +1,6 @@
 #include "gpu/sparse_pricing.hpp"
 
+#include <chrono>
 #include <utility>
 
 namespace indigenous::gpu {
@@ -10,6 +11,8 @@ struct SparsePricingWorkspace::Impl {
   std::vector<double> values;
   std::vector<double> objective;
   bool initialized=false;
+  double initialize_ms=0;
+  double compute_ms=0;
 };
 
 SparsePricingWorkspace::~SparsePricingWorkspace() { delete impl_; }
@@ -31,11 +34,14 @@ bool SparsePricingWorkspace::initialize(
      row_indices.size()!=values.size() ||
      objective.size()+1!=column_offsets.size()) return false;
   if(!impl_) impl_=new Impl();
+  const auto start=std::chrono::steady_clock::now();
   impl_->offsets=column_offsets;
   impl_->rows=row_indices;
   impl_->values=values;
   impl_->objective=objective;
   impl_->initialized=true;
+  impl_->initialize_ms=std::chrono::duration<double,std::milli>(
+      std::chrono::steady_clock::now()-start).count();
   return true;
 }
 
@@ -43,6 +49,7 @@ bool SparsePricingWorkspace::compute(
     const std::vector<double>& dual,
     std::vector<double>& reduced_costs) {
   if(!impl_ || !impl_->initialized) return false;
+  const auto start=std::chrono::steady_clock::now();
   reduced_costs.assign(impl_->objective.size(),0.0);
   for(std::size_t j=0;j<impl_->objective.size();++j){
     double rc=impl_->objective[j];
@@ -52,7 +59,17 @@ bool SparsePricingWorkspace::compute(
     }
     reduced_costs[j]=rc;
   }
+  impl_->compute_ms=std::chrono::duration<double,std::milli>(
+      std::chrono::steady_clock::now()-start).count();
   return true;
+}
+
+double SparsePricingWorkspace::last_initialize_ms() const noexcept {
+  return impl_ ? impl_->initialize_ms : 0.0;
+}
+
+double SparsePricingWorkspace::last_compute_ms() const noexcept {
+  return impl_ ? impl_->compute_ms : 0.0;
 }
 
 bool SparsePricingWorkspace::valid() const noexcept {

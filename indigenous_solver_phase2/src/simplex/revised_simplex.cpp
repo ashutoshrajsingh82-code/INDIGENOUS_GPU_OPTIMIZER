@@ -285,10 +285,12 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
        disable_phase3_value[0]!='0')
       gpu_pricing_enabled=false;
 #endif
-    if(gpu_pricing_enabled &&
-       !pricing_workspace.initialize(
-           pricing_offsets,pricing_rows,pricing_values,c))
-      gpu_pricing_enabled=false;
+    if(gpu_pricing_enabled){
+      const bool initialized=pricing_workspace.initialize(
+          pricing_offsets,pricing_rows,pricing_values,c);
+      stats.pricing_workspace_init_ms+=pricing_workspace.last_initialize_ms();
+      if(!initialized) gpu_pricing_enabled=false;
+    }
 
     for(;phase_iterations<options_.max_iterations && iterations<options_.max_iterations;
         ++phase_iterations,++iterations){

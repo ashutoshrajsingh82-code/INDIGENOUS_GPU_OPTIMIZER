@@ -338,6 +338,11 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
         stats.pricing_host_to_device_ms+=pricing_workspace.last_host_to_device_ms();
         stats.pricing_kernel_ms+=pricing_workspace.last_kernel_ms();
         stats.pricing_device_to_host_ms+=pricing_workspace.last_device_to_host_ms();
+        // A runtime backend failure should permanently disable GPU pricing
+        // for the remainder of this simplex phase. Retrying a failed CUDA
+        // launch on every iteration only adds overhead before falling back
+        // to the known-good CPU implementation.
+        if(!backend_pricing_ok) gpu_pricing_enabled=false;
       }
 
       if(backend_pricing_ok){

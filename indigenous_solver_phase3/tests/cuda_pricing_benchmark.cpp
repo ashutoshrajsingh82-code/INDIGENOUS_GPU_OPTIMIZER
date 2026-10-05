@@ -1,5 +1,9 @@
 #include "gpu/sparse_pricing.hpp"
 
+#if defined(INDIGENOUS_PHASE3_CUDA)
+#include <cuda_runtime.h>
+#endif
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -101,6 +105,24 @@ int main() {
     std::cout << "GPU benchmark skipped (CPU fallback is active).\n";
     return 0;
   }
+
+#if defined(INDIGENOUS_PHASE3_CUDA)
+  int device_count = 0;
+  if(cudaGetDeviceCount(&device_count) != cudaSuccess || device_count <= 0) {
+    std::cout << "CUDA runtime: no usable device detected\n";
+    return 0;
+  }
+  cudaDeviceProp device{};
+  if(cudaGetDeviceProperties(&device, 0) != cudaSuccess) {
+    std::cerr << "Failed to query CUDA device properties\n";
+    return 1;
+  }
+  std::cout << "GPU: " << device.name << "\n";
+  std::cout << "Compute capability: " << device.major << "." << device.minor << "\n";
+  std::cout << "Global memory MB: "
+            << static_cast<double>(device.totalGlobalMem) / (1024.0 * 1024.0) << "\n";
+  std::cout << "CUDA runtime: " << CUDART_VERSION << "\n";
+#endif
 
   indigenous::gpu::SparsePricingWorkspace gpu_workspace;
   if(!gpu_workspace.initialize(

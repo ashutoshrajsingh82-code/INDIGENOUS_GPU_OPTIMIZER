@@ -2,14 +2,16 @@
 #include "gpu/sparse_pricing.hpp"
 
 #include <cuda_runtime.h>
+#include <cstdint>
+#include <limits>
 #include <utility>
 
 namespace indigenous::gpu {
 namespace {
 
 __global__ void sparse_reduced_costs_kernel(
-    const std::size_t* column_offsets,
-    const std::size_t* row_indices,
+    const std::uint32_t* column_offsets,
+    const std::uint32_t* row_indices,
     const double* values,
     const double* objective,
     const double* dual,
@@ -29,8 +31,8 @@ __global__ void sparse_reduced_costs_kernel(
 struct SparsePricingWorkspace::Impl {
   std::size_t column_count=0;
   std::size_t dual_capacity=0;
-  std::size_t* d_offsets=nullptr;
-  std::size_t* d_rows=nullptr;
+  std::uint32_t* d_offsets=nullptr;
+  std::uint32_t* d_rows=nullptr;
   double* d_values=nullptr;
   double* d_objective=nullptr;
   double* d_dual=nullptr;
@@ -115,9 +117,24 @@ bool SparsePricingWorkspace::initialize(
      cudaEventCreate(&impl_->d2h_end)!=cudaSuccess){
     free_device(impl_); return false;
   }
-  const std::size_t offset_bytes=column_offsets.size()*sizeof(std::size_t);
+  // Device indices are 32-bit to halve CSC index bandwidth. Keep the
+  // public API as size_t for portability and convert once during initialization.
+  if(column_offsets.back()>std::numeric_limits<std::uint32_t>::max() ||
+     values.size()>std::numeric_limits<std::uint32_t>::max())
+    { free_device(impl_); return false; }
+  std::vector<std::uint32_t> device_offsets(column_offsets.size());
+  std::vector<std::uint32_t> device_rows(row_indices.size());
+  for(std::size_t i=0;i<column_offsets.size();++i)
+    device_offsets[i]=static_cast<std::uint32_t>(column_offsets[i]);
+  for(std::size_t i=0;i<row_indices.size();++i){
+    if(row_indices[i]>std::numeric_limits<std::uint32_t>::max())
+      { free_device(impl_); return false; }
+    device_rows[i]=static_cast<std::uint32_t>(row_indices[i]);
+  }
+
+  const std::size_t offset_bytes=device_offsets.size()*sizeof(std::uint32_t);
   const std::size_t nnz_bytes=values.size()*sizeof(double);
-  const std::size_t row_bytes=row_indices.size()*sizeof(std::size_t);
+  const std::size_t row_bytes=device_rows.size()*sizeof(std::uint32_t);
   const std::size_t column_bytes=objective.size()*sizeof(double);
 
   if(cudaMalloc(reinterpret_cast<void**>(&impl_->d_offsets),offset_bytes)!=cudaSuccess) return false;
@@ -136,8 +153,8 @@ bool SparsePricingWorkspace::initialize(
     free_device(impl_); return false;
   }
   if(cudaEventRecord(impl_->h2d_start,impl_->stream)!=cudaSuccess ||
-     cudaMemcpyAsync(impl_->d_offsets,column_offsets.data(),offset_bytes,cudaMemcpyHostToDevice,impl_->stream)!=cudaSuccess ||
-     (!row_indices.empty() && cudaMemcpyAsync(impl_->d_rows,row_indices.data(),row_bytes,cudaMemcpyHostToDevice,impl_->stream)!=cudaSuccess) ||
+     cudaMemcpyAsync(impl_->d_offsets,device_offsets.data(),offset_bytes,cudaMemcpyHostToDevice,impl_->stream)!=cudaSuccess ||
+     (!row_indices.empty() && cudaMemcpyAsync(impl_->d_rows,device_rows.data(),row_bytes,cudaMemcpyHostToDevice,impl_->stream)!=cudaSuccess) ||
      (!values.empty() && cudaMemcpyAsync(impl_->d_values,values.data(),nnz_bytes,cudaMemcpyHostToDevice,impl_->stream)!=cudaSuccess) ||
      cudaMemcpyAsync(impl_->d_objective,objective.data(),column_bytes,cudaMemcpyHostToDevice,impl_->stream)!=cudaSuccess){
     free_device(impl_); return false;

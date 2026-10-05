@@ -63,6 +63,17 @@ bool close_enough(const std::vector<double>& a,
   }
   return true;
 }
+
+void compute_cpu_reference(const BenchmarkData& data,
+                           std::vector<double>& result) {
+  result.assign(data.objective.size(), 0.0);
+  for(std::size_t j = 0; j < data.objective.size(); ++j) {
+    double rc = data.objective[j];
+    for(std::size_t p = data.offsets[j]; p < data.offsets[j + 1]; ++p)
+      rc -= data.values[p] * data.dual[data.rows[p]];
+    result[j] = rc;
+  }
+}
 }
 
 int main() {
@@ -73,24 +84,15 @@ int main() {
 
   const BenchmarkData data = make_problem(rows, columns, nnz_per_column);
 
-  indigenous::gpu::SparsePricingWorkspace cpu_workspace;
-  if(!cpu_workspace.initialize(
-         data.offsets, data.rows, data.values, data.objective)) {
-    std::cerr << "CPU workspace initialization failed\n";
-    return 1;
-  }
-
   std::vector<double> cpu_result;
   double cpu_total_ms = 0.0;
   for(int i = 0; i < repeats; ++i) {
     const auto start = std::chrono::steady_clock::now();
-    if(!cpu_workspace.compute(data.dual, cpu_result)) {
-      std::cerr << "CPU pricing failed\n";
-      return 1;
-    }
+    compute_cpu_reference(data, cpu_result);
     cpu_total_ms += std::chrono::duration<double, std::milli>(
         std::chrono::steady_clock::now() - start).count();
   }
+
 
   std::cout << std::fixed << std::setprecision(4);
   std::cout << "CUDA pricing benchmark\n";
@@ -98,7 +100,7 @@ int main() {
             << " | Columns: " << columns
             << " | NNZ: " << data.values.size()
             << " | Repeats: " << repeats << "\n";
-  std::cout << "CPU avg compute_ms: " << cpu_total_ms / repeats << "\n";
+  std::cout << "CPU reference avg compute_ms: " << cpu_total_ms / repeats << "\n";
 
   if(!indigenous::gpu::available()) {
     std::cout << "CUDA backend: UNAVAILABLE\n";

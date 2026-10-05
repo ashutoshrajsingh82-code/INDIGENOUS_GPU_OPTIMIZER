@@ -327,13 +327,11 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       std::vector<Real> reduced_costs(total,0);
       bool backend_pricing_ok=false;
       if(gpu_pricing_enabled){
-        const auto backend_start=std::chrono::steady_clock::now();
         backend_pricing_ok=pricing_workspace.compute(pi,reduced_costs);
-        stats.pricing_backend_ms+=elapsed_ms(backend_start);
-        stats.pricing_workspace_init_ms+=pricing_workspace.last_initialize_ms();
-        stats.pricing_host_to_device_ms+=0.0;
-        stats.pricing_kernel_ms+=0.0;
-        stats.pricing_device_to_host_ms+=0.0;
+        stats.pricing_backend_ms+=pricing_workspace.last_compute_ms();
+        stats.pricing_host_to_device_ms+=pricing_workspace.last_host_to_device_ms();
+        stats.pricing_kernel_ms+=pricing_workspace.last_kernel_ms();
+        stats.pricing_device_to_host_ms+=pricing_workspace.last_device_to_host_ms();
       }
 
       if(!backend_pricing_ok){

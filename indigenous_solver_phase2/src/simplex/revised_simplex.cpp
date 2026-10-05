@@ -340,7 +340,11 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
         stats.pricing_device_to_host_ms+=pricing_workspace.last_device_to_host_ms();
       }
 
+      if(backend_pricing_ok){
+        ++stats.pricing_cuda_calls;
+      }
       if(!backend_pricing_ok){
+        ++stats.pricing_cpu_calls;
         // CPU fast path: compute all reduced costs with the original scalar
         // CSC traversal, then run the selection scan separately.
         const auto backend_start=std::chrono::steady_clock::now();

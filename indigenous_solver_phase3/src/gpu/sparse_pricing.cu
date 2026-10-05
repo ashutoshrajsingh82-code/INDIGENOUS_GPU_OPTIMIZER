@@ -201,6 +201,9 @@ bool SparsePricingWorkspace::compute(
 
 double SparsePricingWorkspace::last_initialize_ms() const noexcept { return impl_ ? impl_->initialize_ms : 0.0; }
 double SparsePricingWorkspace::last_compute_ms() const noexcept { return impl_ ? impl_->compute_ms : 0.0; }
+double SparsePricingWorkspace::last_host_to_device_ms() const noexcept { return impl_ ? impl_->host_to_device_ms : 0.0; }
+double SparsePricingWorkspace::last_kernel_ms() const noexcept { return impl_ ? impl_->kernel_ms : 0.0; }
+double SparsePricingWorkspace::last_device_to_host_ms() const noexcept { return impl_ ? impl_->device_to_host_ms : 0.0; }
 
 bool SparsePricingWorkspace::valid() const noexcept {
   return impl_!=nullptr && impl_->initialized;

@@ -321,44 +321,55 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       for(Index j=0;j<total;++j)
         if(std::abs(c[j])>options_.dual_tolerance) ++nonzero_cost_count;
 
-      // Phase 3 uses the persistent CUDA workspace only when a CUDA device
-      // is available. Otherwise use the original scalar CSC loop directly,
-      // making the CPU fallback performance-equivalent to the Phase 2 path.
-      std::vector<Real> reduced_costs;
+      // Phase 3 separates reduced-cost computation from the pricing
+      // selection scan so benchmark output can identify the actual backend
+      // cost. CUDA builds additionally expose transfer and kernel timings.
+      std::vector<Real> reduced_costs(total,0);
       bool backend_pricing_ok=false;
       if(gpu_pricing_enabled){
+        const auto backend_start=std::chrono::steady_clock::now();
         backend_pricing_ok=pricing_workspace.compute(pi,reduced_costs);
+        stats.pricing_backend_ms+=elapsed_ms(backend_start);
+        stats.pricing_workspace_init_ms+=pricing_workspace.last_initialize_ms();
+        stats.pricing_host_to_device_ms+=0.0;
+        stats.pricing_kernel_ms+=0.0;
+        stats.pricing_device_to_host_ms+=0.0;
       }
 
-      if(backend_pricing_ok){
+      if(!backend_pricing_ok){
+        // CPU fast path: compute all reduced costs with the original scalar
+        // CSC traversal, then run the selection scan separately.
+        const auto backend_start=std::chrono::steady_clock::now();
         for(Index j=0;j<total;++j){
-          if(is_basic[j]) continue;
-          if(!phase_one && sys.artificial[j]) continue;
-
-          const Real rc=reduced_costs[static_cast<std::size_t>(j)];
-          if(!phase_one && rc>max_rc){max_rc=rc;max_rc_j=j;}
-          const Real weight=options_.use_devex
-              ? std::max<Real>(1.0,devex_weight[j]) : 1.0;
-          const Real score=rc/std::sqrt(weight);
-          if(score>best){best=score;enter=j;}
-        }
-      } else {
-        // Preserve the original CPU pricing path as a correctness and
-        // failure fallback if the backend rejects the sparse representation.
-        for(Index j=0;j<total;++j){
-          if(is_basic[j]) continue;
-          if(!phase_one && sys.artificial[j]) continue;
-
           Real rc=c[j];
           for(const auto& [i,value] : sparse_columns[j]) rc-=pi[i]*value;
-          if(!phase_one && rc>max_rc){max_rc=rc;max_rc_j=j;}
-          const Real weight=options_.use_devex
-              ? std::max<Real>(1.0,devex_weight[j]) : 1.0;
-          const Real score=rc/std::sqrt(weight);
-          if(score>best){best=score;enter=j;}
+          reduced_costs[static_cast<std::size_t>(j)]=rc;
         }
+        stats.pricing_backend_ms+=elapsed_ms(backend_start);
       }
+
+      const auto selection_start=std::chrono::steady_clock::now();
+      for(Index j=0;j<total;++j){
+        if(is_basic[j]) continue;
+        if(!phase_one && sys.artificial[j]) continue;
+
+        const Real rc=reduced_costs[static_cast<std::size_t>(j)];
+        if(!phase_one && rc>max_rc){max_rc=rc;max_rc_j=j;}
+        const Real weight=options_.use_devex
+            ? std::max<Real>(1.0,devex_weight[j]) : 1.0;
+        const Real score=rc/std::sqrt(weight);
+        if(score>best){best=score;enter=j;}
+      }
+      stats.pricing_selection_ms+=elapsed_ms(selection_start);
       stats.pricing_ms+=elapsed_ms(pricing_start);
+
+      if(!phase_one && kPhase2Debug && phase_iterations==0){
+        std::cerr<<"[PHASE3_PRICING] backend="
+                 <<(gpu_pricing_enabled && backend_pricing_ok ? "CUDA":"CPU")
+                 <<" backend_ms="<<stats.pricing_backend_ms
+                 <<" selection_ms="<<stats.pricing_selection_ms
+                 <<" rows="<<M<<" cols="<<total<<"\\n";
+      }
       if(!phase_one && phase_iterations==0 && kPhase2Debug){
         std::cerr<<"[PHASE2_DEBUG] rows="<<M
                  <<" cols="<<total

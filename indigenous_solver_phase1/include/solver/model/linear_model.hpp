@@ -42,6 +42,8 @@ struct SimplexStatistics {
   std::size_t btran_solves=0;
   std::size_t pivots=0;
   std::size_t max_lu_nonzeros=0;
+  std::size_t pricing_cuda_calls=0;
+  std::size_t pricing_cpu_calls=0;
 };
 struct SolveResult {
   SolveStatus status;

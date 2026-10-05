@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <vector>
+#include "gpu/vector_ops.hpp"
 
 namespace indigenous::gpu {
 

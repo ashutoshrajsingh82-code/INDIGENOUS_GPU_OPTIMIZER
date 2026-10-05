@@ -46,14 +46,15 @@ int main(int argc,char**argv){
   std::cout<<"Pricing backend: "<<pricing_backend<<"\\n"
            <<"Pricing CUDA calls: "<<s.pricing_cuda_calls<<"\\n"
            <<"Pricing CPU calls: "<<s.pricing_cpu_calls<<"\\n"
-           <<"Timing pivot_ms: "<<s.pivot_ms<<"\\n";          <<"Timing ratio_test_ms: "<<s.ratio_test_ms<<"\n"
-           <<"Timing basis_update_ms: "<<s.basis_update_ms<<"\n"
-           <<"LU factorizations: "<<s.lu_factorizations<<"\n"
-           <<"LU updates: "<<s.lu_updates<<"\n"
-           <<"BTRAN solves: "<<s.btran_solves<<"\n"
-           <<"FTRAN solves: "<<s.ftran_solves<<"\n"
-           <<"Pivots: "<<s.pivots<<"\n"
-           <<"Max LU nonzeros: "<<s.max_lu_nonzeros<<"\n";
+           <<"Timing pivot_ms: "<<s.pivot_ms<<"\\n"
+           <<"Timing ratio_test_ms: "<<s.ratio_test_ms<<"\\n"
+           <<"Timing basis_update_ms: "<<s.basis_update_ms<<"\\n"
+           <<"LU factorizations: "<<s.lu_factorizations<<"\\n"
+           <<"LU updates: "<<s.lu_updates<<"\\n"
+           <<"BTRAN solves: "<<s.btran_solves<<"\\n"
+           <<"FTRAN solves: "<<s.ftran_solves<<"\\n"
+           <<"Pivots: "<<s.pivots<<"\\n"
+           <<"Max LU nonzeros: "<<s.max_lu_nonzeros<<"\\n";
   if(!r.primal.empty()){auto v=validate_solution(m,r.primal,r.objective_value);std::cout<<"Certificate: "<<(v.valid?"PASS":"FAIL")<<"\n"<<"Certificate max primal violation: "<<std::setprecision(12)<<v.max_primal_violation<<"\n"<<"Certificate objective difference: "<<std::setprecision(12)<<v.objective_difference<<"\n"<<v.message<<"\n";for(size_t i=0;i<r.primal.size();++i)std::cout<<"  "<<m.variables[i].name<<" = "<<std::setprecision(12)<<r.primal[i]<<"\n";}
   return r.status==SolveStatus::Optimal?0:1;
 }

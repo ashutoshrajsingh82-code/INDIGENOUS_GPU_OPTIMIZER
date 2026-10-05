@@ -264,9 +264,31 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
     phase_iterations=0;
     // Objective coefficients differ between Phase I and Phase II, so upload
     // the immutable matrix plus the current phase objective once per phase.
-    if(!pricing_workspace.initialize(
+    // Only initialize the GPU workspace when a CUDA device is actually
+    // available. CPU-only builds (and CUDA builds with no usable device)
+    // stay on the original scalar CSC pricing path without workspace
+    // abstraction or host/device management overhead.
+    bool gpu_pricing_enabled=indigenous::gpu::available();
+#ifdef _WIN32
+    char* disable_phase3_value=nullptr;
+    std::size_t disable_phase3_size=0;
+    if(_dupenv_s(&disable_phase3_value,&disable_phase3_size,
+                 "PHASE3_DISABLE_GPU_PRICING")==0 &&
+       disable_phase3_value!=nullptr){
+      if(disable_phase3_value[0] && disable_phase3_value[0]!='0')
+        gpu_pricing_enabled=false;
+      std::free(disable_phase3_value);
+    }
+#else
+    const char* disable_phase3_value=std::getenv("PHASE3_DISABLE_GPU_PRICING");
+    if(disable_phase3_value && disable_phase3_value[0] &&
+       disable_phase3_value[0]!='0')
+      gpu_pricing_enabled=false;
+#endif
+    if(gpu_pricing_enabled &&
+       !pricing_workspace.initialize(
            pricing_offsets,pricing_rows,pricing_values,c))
-      return SolveStatus::NumericalFailure;
+      gpu_pricing_enabled=false;
 
     for(;phase_iterations<options_.max_iterations && iterations<options_.max_iterations;
         ++phase_iterations,++iterations){
@@ -299,27 +321,12 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       for(Index j=0;j<total;++j)
         if(std::abs(c[j])>options_.dual_tolerance) ++nonzero_cost_count;
 
-      // Phase 3 pricing reuses the immutable CSC representation built
-      // before the simplex iterations. On an NVIDIA build this dispatches to
-      // CUDA; on this machine it uses the validated CPU fallback. The original
-      // scalar loop remains available through PHASE3_DISABLE_GPU_PRICING.
-      bool use_phase3_pricing=true;
-#ifdef _WIN32
-      char* disable_value=nullptr;
-      std::size_t disable_size=0;
-      if(_dupenv_s(&disable_value,&disable_size,"PHASE3_DISABLE_GPU_PRICING")==0 &&
-         disable_value!=nullptr){
-        use_phase3_pricing=!(disable_value[0] && disable_value[0]!='0');
-        std::free(disable_value);
-      }
-#else
-      const char* disable_value=std::getenv("PHASE3_DISABLE_GPU_PRICING");
-      use_phase3_pricing=!(disable_value && disable_value[0] && disable_value[0]!='0');
-#endif
-
+      // Phase 3 uses the persistent CUDA workspace only when a CUDA device
+      // is available. Otherwise use the original scalar CSC loop directly,
+      // making the CPU fallback performance-equivalent to the Phase 2 path.
       std::vector<Real> reduced_costs;
       bool backend_pricing_ok=false;
-      if(use_phase3_pricing){
+      if(gpu_pricing_enabled){
         backend_pricing_ok=pricing_workspace.compute(pi,reduced_costs);
       }
 

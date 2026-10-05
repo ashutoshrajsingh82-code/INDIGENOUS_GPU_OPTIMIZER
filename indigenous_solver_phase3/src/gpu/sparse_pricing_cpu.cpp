@@ -1,5 +1,6 @@
 #include "gpu/sparse_pricing.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <utility>
 
@@ -10,6 +11,7 @@ struct SparsePricingWorkspace::Impl {
   std::vector<std::size_t> rows;
   std::vector<double> values;
   std::vector<double> objective;
+  std::size_t max_row_index=0;
   bool initialized=false;
   double initialize_ms=0;
   double compute_ms=0;
@@ -39,6 +41,9 @@ bool SparsePricingWorkspace::initialize(
   impl_->rows=row_indices;
   impl_->values=values;
   impl_->objective=objective;
+  impl_->max_row_index=0;
+  for(const std::size_t row : impl_->rows)
+    impl_->max_row_index=std::max(impl_->max_row_index,row);
   impl_->initialized=true;
   impl_->initialize_ms=std::chrono::duration<double,std::milli>(
       std::chrono::steady_clock::now()-start).count();
@@ -50,14 +55,26 @@ bool SparsePricingWorkspace::compute(
     std::vector<double>& reduced_costs) {
   if(!impl_ || !impl_->initialized) return false;
   const auto start=std::chrono::steady_clock::now();
-  reduced_costs.assign(impl_->objective.size(),0.0);
-  for(std::size_t j=0;j<impl_->objective.size();++j){
-    double rc=impl_->objective[j];
-    for(std::size_t p=impl_->offsets[j];p<impl_->offsets[j+1];++p){
-      if(impl_->rows[p]>=dual.size()) return false;
-      rc-=impl_->values[p]*dual[impl_->rows[p]];
-    }
-    reduced_costs[j]=rc;
+  if(!impl_->rows.empty() && impl_->max_row_index>=dual.size()) return false;
+
+  const std::size_t column_count=impl_->objective.size();
+  reduced_costs.resize(column_count);
+
+  const auto* offsets=impl_->offsets.data();
+  const auto* rows=impl_->rows.data();
+  const auto* values=impl_->values.data();
+  const auto* objective=impl_->objective.data();
+  const auto* dual_data=dual.data();
+  auto* output=reduced_costs.data();
+
+  // The workspace owns contiguous CSC arrays, so keep the hot loop to
+  // pointer/index arithmetic and one multiply-subtract per nonzero. Row
+  // bounds are validated once above instead of inside every nonzero visit.
+  for(std::size_t j=0;j<column_count;++j){
+    double rc=objective[j];
+    for(std::size_t p=offsets[j];p<offsets[j+1];++p)
+      rc-=values[p]*dual_data[rows[p]];
+    output[j]=rc;
   }
   impl_->compute_ms=std::chrono::duration<double,std::milli>(
       std::chrono::steady_clock::now()-start).count();

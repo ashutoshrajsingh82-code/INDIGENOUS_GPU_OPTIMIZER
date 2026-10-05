@@ -235,6 +235,10 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
   std::vector<bool> is_basic(total,false);
   for(Index q:sys.basis) is_basic[q]=true;
   std::vector<Real> devex_weight(total,1.0);
+  // Cache 1/sqrt(weight) so the pricing selection scan performs a multiply
+  // instead of a square-root for every nonbasic column on every iteration.
+  // We update the cached factor only when a Devex weight changes.
+  std::vector<Real> devex_inv_sqrt(total,1.0);
   std::vector<Real> pi, direction;
   std::size_t iterations=0;
 
@@ -355,9 +359,8 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
 
         const Real rc=reduced_costs[static_cast<std::size_t>(j)];
         if(!phase_one && rc>max_rc){max_rc=rc;max_rc_j=j;}
-        const Real weight=options_.use_devex
-            ? std::max<Real>(1.0,devex_weight[j]) : 1.0;
-        const Real score=rc/std::sqrt(weight);
+        const Real score=options_.use_devex
+            ? rc*devex_inv_sqrt[j] : rc;
         if(score>best){best=score;enter=j;}
       }
       stats.pricing_selection_ms+=elapsed_ms(selection_start);
@@ -493,8 +496,11 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
 
       if(options_.use_devex){
         devex_weight[enter]=std::max<Real>(1.0,new_weight);
-        if(devex_weight[enter]>1e12)
+        devex_inv_sqrt[enter]=1.0/std::sqrt(devex_weight[enter]);
+        if(devex_weight[enter]>1e12){
           for(Real& w:devex_weight) w=1.0;
+          std::fill(devex_inv_sqrt.begin(),devex_inv_sqrt.end(),1.0);
+        }
       }
 
       x[enter]=theta;

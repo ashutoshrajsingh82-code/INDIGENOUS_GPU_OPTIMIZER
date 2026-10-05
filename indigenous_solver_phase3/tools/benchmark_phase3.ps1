@@ -21,6 +21,12 @@ function Get-Metric([string]$text, [string]$pattern, [scriptblock]$convert) {
   return & $convert $match.Groups[1].Value.Trim()
 }
 
+function Get-OptionalMetric([string]$text, [string]$pattern) {
+  $match = [regex]::Match($text, $pattern)
+  if (!$match.Success) { return 0.0 }
+  return [double]$match.Groups[1].Value.Trim()
+}
+
 $rows = @()
 foreach ($model in $models) {
   Write-Host "===== $model ====="
@@ -33,6 +39,14 @@ foreach ($model in $models) {
   $p3Time = Get-Metric $p3 "(?m)^Timing total_ms:\s*(.+)$" { param($v) [double]$v }
   $p2Pricing = Get-Metric $p2 "(?m)^Timing pricing_ms:\s*(.+)$" { param($v) [double]$v }
   $p3Pricing = Get-Metric $p3 "(?m)^Timing pricing_ms:\s*(.+)$" { param($v) [double]$v }
+  $p2Backend = Get-OptionalMetric $p2 "(?m)^Timing pricing_backend_ms:\s*(.+)$"
+  $p3Backend = Get-OptionalMetric $p3 "(?m)^Timing pricing_backend_ms:\s*(.+)$"
+  $p2Selection = Get-OptionalMetric $p2 "(?m)^Timing pricing_selection_ms:\s*(.+)$"
+  $p3Selection = Get-OptionalMetric $p3 "(?m)^Timing pricing_selection_ms:\s*(.+)$"
+  $p3WorkspaceInit = Get-OptionalMetric $p3 "(?m)^Timing pricing_workspace_init_ms:\s*(.+)$"
+  $p3H2D = Get-OptionalMetric $p3 "(?m)^Timing pricing_host_to_device_ms:\s*(.+)$"
+  $p3Kernel = Get-OptionalMetric $p3 "(?m)^Timing pricing_kernel_ms:\s*(.+)$"
+  $p3D2H = Get-OptionalMetric $p3 "(?m)^Timing pricing_device_to_host_ms:\s*(.+)$"
   $p2Iter = Get-Metric $p2 "(?m)^Iterations:\s*(.+)$" { param($v) [int]$v }
   $p3Iter = Get-Metric $p3 "(?m)^Iterations:\s*(.+)$" { param($v) [int]$v }
   $p2Cert = Get-Metric $p2 "(?m)^Certificate:\s*(.+)$" { param($v) $v }
@@ -49,6 +63,14 @@ foreach ($model in $models) {
     phase3_speedup=[math]::Round($speedup,4)
     phase2_pricing_ms=$p2Pricing
     phase3_pricing_ms=$p3Pricing
+    phase2_pricing_backend_ms=$p2Backend
+    phase3_pricing_backend_ms=$p3Backend
+    phase2_pricing_selection_ms=$p2Selection
+    phase3_pricing_selection_ms=$p3Selection
+    phase3_workspace_init_ms=$p3WorkspaceInit
+    phase3_host_to_device_ms=$p3H2D
+    phase3_kernel_ms=$p3Kernel
+    phase3_device_to_host_ms=$p3D2H
     pricing_speedup=[math]::Round($pricingSpeedup,4)
     phase2_iterations=$p2Iter
     phase3_iterations=$p3Iter
@@ -69,6 +91,14 @@ $totalP2 = ($rows | Measure-Object -Property phase2_ms -Sum).Sum
 $totalP3 = ($rows | Measure-Object -Property phase3_ms -Sum).Sum
 $totalP2Pricing = ($rows | Measure-Object -Property phase2_pricing_ms -Sum).Sum
 $totalP3Pricing = ($rows | Measure-Object -Property phase3_pricing_ms -Sum).Sum
+$totalP2Backend = ($rows | Measure-Object -Property phase2_pricing_backend_ms -Sum).Sum
+$totalP3Backend = ($rows | Measure-Object -Property phase3_pricing_backend_ms -Sum).Sum
+$totalP2Selection = ($rows | Measure-Object -Property phase2_pricing_selection_ms -Sum).Sum
+$totalP3Selection = ($rows | Measure-Object -Property phase3_pricing_selection_ms -Sum).Sum
+$totalP3WorkspaceInit = ($rows | Measure-Object -Property phase3_workspace_init_ms -Sum).Sum
+$totalP3H2D = ($rows | Measure-Object -Property phase3_host_to_device_ms -Sum).Sum
+$totalP3Kernel = ($rows | Measure-Object -Property phase3_kernel_ms -Sum).Sum
+$totalP3D2H = ($rows | Measure-Object -Property phase3_device_to_host_ms -Sum).Sum
 $totalP2Iterations = ($rows | Measure-Object -Property phase2_iterations -Sum).Sum
 $totalP3Iterations = ($rows | Measure-Object -Property phase3_iterations -Sum).Sum
 $aggregateSpeedup = if ($totalP3 -gt 0) { $totalP2 / $totalP3 } else { 0 }
@@ -136,6 +166,14 @@ $report += "| Average per-model speedup | $([math]::Round($avgSpeedup,4))x |"
 $report += "| Median per-model speedup | $([math]::Round($medianSpeedup,4))x |"
 $report += "| Phase 2 pricing total | $([math]::Round($totalP2Pricing,4)) ms |"
 $report += "| Phase 3 pricing total | $([math]::Round($totalP3Pricing,4)) ms |"
+$report += "| Phase 2 backend pricing total | $([math]::Round($totalP2Backend,4)) ms |"
+$report += "| Phase 3 backend pricing total | $([math]::Round($totalP3Backend,4)) ms |"
+$report += "| Phase 2 selection total | $([math]::Round($totalP2Selection,4)) ms |"
+$report += "| Phase 3 selection total | $([math]::Round($totalP3Selection,4)) ms |"
+$report += "| Phase 3 workspace initialization | $([math]::Round($totalP3WorkspaceInit,4)) ms |"
+$report += "| Phase 3 host → device | $([math]::Round($totalP3H2D,4)) ms |"
+$report += "| Phase 3 CUDA kernel | $([math]::Round($totalP3Kernel,4)) ms |"
+$report += "| Phase 3 device → host | $([math]::Round($totalP3D2H,4)) ms |"
 $report += "| Aggregate pricing speedup | $([math]::Round($aggregatePricingSpeedup,4))x |"
 $report += "| Phase 2 iterations | $totalP2Iterations |"
 $report += "| Phase 3 iterations | $totalP3Iterations |"
@@ -146,10 +184,10 @@ $report += "| Maximum objective difference | $maxObjectiveDiff |"
 $report += ""
 $report += "## Per-model Results"
 $report += ""
-$report += "| Model | Phase 2 ms | Phase 3 ms | Speedup | P2 Pricing ms | P3 Pricing ms | Pricing Speedup | P3 Cert |"
-$report += "|---|---:|---:|---:|---:|---:|---:|---|"
+$report += "| Model | Phase 2 ms | Phase 3 ms | Speedup | P2 Pricing ms | P3 Pricing ms | P2 Backend | P3 Backend | P3 Selection | P3 Cert |"
+$report += "|---|---:|---:|---:|---:|---:|---:|---:|---:|---|"
 foreach ($row in $rows) {
-  $report += "| $($row.model) | $([math]::Round($row.phase2_ms,4)) | $([math]::Round($row.phase3_ms,4)) | $([math]::Round($row.phase3_speedup,4))x | $([math]::Round($row.phase2_pricing_ms,4)) | $([math]::Round($row.phase3_pricing_ms,4)) | $([math]::Round($row.pricing_speedup,4))x | $($row.phase3_certificate) |"
+  $report += "| $($row.model) | $([math]::Round($row.phase2_ms,4)) | $([math]::Round($row.phase3_ms,4)) | $([math]::Round($row.phase3_speedup,4))x | $([math]::Round($row.phase2_pricing_ms,4)) | $([math]::Round($row.phase3_pricing_ms,4)) | $([math]::Round($row.phase2_pricing_backend_ms,4)) | $([math]::Round($row.phase3_pricing_backend_ms,4)) | $([math]::Round($row.phase3_pricing_selection_ms,4)) | $($row.phase3_certificate) |"
 }
 $report += ""
 $report += "## Interpretation"
@@ -174,6 +212,8 @@ Write-Host "=== Phase 3 Benchmark Summary ==="
 Write-Host ("Models: {0} | Faster: {1} | Slower: {2} | Certificates PASS: {3}/{0}" -f $rows.Count,$wins,$losses,$certPass)
 Write-Host ("Total: Phase2 {0:N4} ms | Phase3 {1:N4} ms | Aggregate speedup: {2:N2}x" -f $totalP2,$totalP3,$aggregateSpeedup)
 Write-Host ("Pricing: Phase2 {0:N4} ms | Phase3 {1:N4} ms | Aggregate speedup: {2:N2}x" -f $totalP2Pricing,$totalP3Pricing,$aggregatePricingSpeedup)
+Write-Host ("Backend: Phase2 {0:N4} ms | Phase3 {1:N4} ms | Selection: Phase2 {2:N4} ms | Phase3 {3:N4} ms" -f $totalP2Backend,$totalP3Backend,$totalP2Selection,$totalP3Selection)
+Write-Host ("Phase3 GPU stages: init {0:N4} ms | H2D {1:N4} ms | kernel {2:N4} ms | D2H {3:N4} ms" -f $totalP3WorkspaceInit,$totalP3H2D,$totalP3Kernel,$totalP3D2H)
 Write-Host ("Average per-model speedup: {0:N2}x | Median: {1:N2}x | Max objective diff: {2:E6}" -f $avgSpeedup,$medianSpeedup,$maxObjectiveDiff)
 Write-Host ""
 Write-Host "CSV: $OutputCsv"

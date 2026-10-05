@@ -39,11 +39,14 @@ int main(int argc,char**argv){
            <<"Timing pricing_workspace_init_ms: "<<s.pricing_workspace_init_ms<<"\n"
            <<"Timing pricing_host_to_device_ms: "<<s.pricing_host_to_device_ms<<"\n"
            <<"Timing pricing_kernel_ms: "<<s.pricing_kernel_ms<<"\n"
-           <<"Timing pricing_device_to_host_ms: "<<s.pricing_device_to_host_ms<<"\n"
-           <<"Pricing CUDA calls: "<<s.pricing_cuda_calls<<"\n"
-           <<"Pricing CPU calls: "<<s.pricing_cpu_calls<<"\n"
-           <<"Timing pivot_ms: "<<s.pivot_ms<<"\n"
-           <<"Timing ratio_test_ms: "<<s.ratio_test_ms<<"\n"
+           <<"Timing pricing_device_to_host_ms: "<<s.pricing_device_to_host_ms<<"\\n";
+  const char* pricing_backend = s.pricing_cuda_calls > 0 && s.pricing_cpu_calls == 0 ? "CUDA" :
+                                s.pricing_cuda_calls == 0 && s.pricing_cpu_calls > 0 ? "CPU" :
+                                s.pricing_cuda_calls > 0 && s.pricing_cpu_calls > 0 ? "MIXED" : "NONE";
+  std::cout<<"Pricing backend: "<<pricing_backend<<"\\n"
+           <<"Pricing CUDA calls: "<<s.pricing_cuda_calls<<"\\n"
+           <<"Pricing CPU calls: "<<s.pricing_cpu_calls<<"\\n"
+           <<"Timing pivot_ms: "<<s.pivot_ms<<"\\n";          <<"Timing ratio_test_ms: "<<s.ratio_test_ms<<"\n"
            <<"Timing basis_update_ms: "<<s.basis_update_ms<<"\n"
            <<"LU factorizations: "<<s.lu_factorizations<<"\n"
            <<"LU updates: "<<s.lu_updates<<"\n"

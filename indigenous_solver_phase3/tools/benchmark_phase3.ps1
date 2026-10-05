@@ -58,6 +58,7 @@ foreach ($model in $models) {
   $p3H2D = Get-OptionalMetric $p3 "(?m)^Timing pricing_host_to_device_ms:\s*(.+)$"
   $p3Kernel = Get-OptionalMetric $p3 "(?m)^Timing pricing_kernel_ms:\s*(.+)$"
   $p3D2H = Get-OptionalMetric $p3 "(?m)^Timing pricing_device_to_host_ms:\s*(.+)$"
+  $p3BackendMode = Get-OptionalText $p3 "(?m)^Pricing backend:\s*(.+)$"
   $p2Iter = Get-Metric $p2 "(?m)^Iterations:\s*(.+)$" { param($v) [int]$v }
   $p3Iter = Get-Metric $p3 "(?m)^Iterations:\s*(.+)$" { param($v) [int]$v }
   $p2Cert = Get-Metric $p2 "(?m)^Certificate:\s*(.+)$" { param($v) $v }

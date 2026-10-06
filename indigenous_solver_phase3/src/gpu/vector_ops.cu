@@ -3,6 +3,7 @@
 #include <cuda_runtime.h>
 
 #include <cstddef>
+#include <string>
 
 namespace indigenous::gpu {
 namespace {
@@ -17,6 +18,22 @@ __global__ void axpy_kernel(float alpha, const float* x, float* y, std::size_t n
 bool available() {
   int count = 0;
   return cudaGetDeviceCount(&count) == cudaSuccess && count > 0;
+}
+
+std::string runtime_status() {
+  int count = 0;
+  const cudaError_t status = cudaGetDeviceCount(&count);
+  if(status != cudaSuccess) {
+    return std::string("CUDA runtime error: ") + cudaGetErrorString(status);
+  }
+  if(count <= 0) return "CUDA runtime: no CUDA-capable device detected";
+
+  cudaDeviceProp prop{};
+  if(cudaGetDeviceProperties(&prop, 0) != cudaSuccess)
+    return "CUDA runtime: device detected, but device properties could not be queried";
+
+  return std::string("CUDA runtime: ") + prop.name + " (" +
+         std::to_string(prop.major) + "." + std::to_string(prop.minor) + ")";
 }
 
 bool axpy(float alpha, const std::vector<float>& x, std::vector<float>& y) {

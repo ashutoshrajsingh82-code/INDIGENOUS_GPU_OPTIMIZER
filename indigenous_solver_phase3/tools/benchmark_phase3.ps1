@@ -4,7 +4,8 @@ param(
   [string]$Phase3Exe = "indigenous_solver_phase3\build\Release\solver_phase3_cli.exe",
   [string]$OutputCsv = "benchmarks\netlib\phase3_comparison.csv",
   [string]$OutputSummaryCsv = "benchmarks\netlib\phase3_summary.csv",
-  [string]$OutputReport = "benchmarks\netlib\phase3_benchmark_report.md"
+  [string]$OutputReport = "benchmarks\netlib\phase3_benchmark_report.md",
+  [switch]$RequireCuda
 )
 
 $models = @("afiro","adlittle","blend","bore3d","brandy","grow15","kb2","lotfi","sc50b","share1b")
@@ -59,6 +60,11 @@ foreach ($model in $models) {
   $p3Kernel = Get-OptionalMetric $p3 "(?m)^Timing pricing_kernel_ms:\s*(.+)$"
   $p3D2H = Get-OptionalMetric $p3 "(?m)^Timing pricing_device_to_host_ms:\s*(.+)$"
   $p3BackendMode = Get-OptionalText $p3 "(?m)^Pricing backend:\s*(.+)$"
+  $p3CudaCalls = Get-OptionalMetric $p3 "(?m)^Pricing CUDA calls:\s*(.+)$"
+  $p3CpuCalls = Get-OptionalMetric $p3 "(?m)^Pricing CPU calls:\s*(.+)$"
+  if ($RequireCuda -and $p3BackendMode -ne "CUDA") {
+    throw "CUDA was required but model $model reported Pricing backend: $p3BackendMode (CUDA calls: $p3CudaCalls, CPU calls: $p3CpuCalls)."
+  }
   $p2Iter = Get-Metric $p2 "(?m)^Iterations:\s*(.+)$" { param($v) [int]$v }
   $p3Iter = Get-Metric $p3 "(?m)^Iterations:\s*(.+)$" { param($v) [int]$v }
   $p2Cert = Get-Metric $p2 "(?m)^Certificate:\s*(.+)$" { param($v) $v }
@@ -84,6 +90,8 @@ foreach ($model in $models) {
     phase3_kernel_ms=$p3Kernel
     phase3_device_to_host_ms=$p3D2H
     phase3_backend=$p3BackendMode
+    phase3_cuda_calls=$p3CudaCalls
+    phase3_cpu_calls=$p3CpuCalls
     pricing_speedup=[math]::Round($pricingSpeedup,4)
     phase2_iterations=$p2Iter
     phase3_iterations=$p3Iter
@@ -201,6 +209,8 @@ $report += "| Phase 3 iterations | $totalP3Iterations |"
 $report += "| Phase 3 faster | $wins / $($rows.Count) |"
 $report += "| Phase 3 slower | $losses / $($rows.Count) |"
 $report += "| Phase 3 certificates PASS | $certPass / $($rows.Count) |"
+$report += "| CUDA required | $RequireCuda |"
+$report += "| Phase 3 CUDA calls | $(($rows | Measure-Object -Property phase3_cuda_calls -Sum).Sum) |"
 $report += "| Maximum objective difference | $maxObjectiveDiff |"
 $report += ""
 $report += "## Per-model Results"
@@ -239,4 +249,5 @@ Write-Host ("Average per-model speedup: {0:N2}x | Median: {1:N2}x | Max objectiv
 Write-Host ""
 Write-Host "CSV: $OutputCsv"
 Write-Host "Summary CSV: $OutputSummaryCsv"
+Write-Host ("CUDA requirement: {0}" -f $RequireCuda)
 Write-Host "Report: $OutputReport"

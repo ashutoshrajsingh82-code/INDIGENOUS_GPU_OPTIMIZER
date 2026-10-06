@@ -295,6 +295,8 @@ SolveResult RevisedSimplexSolver::solve(const LinearModel& input) const {
       stats.pricing_workspace_init_ms+=pricing_workspace.last_initialize_ms();
       if(!initialized) gpu_pricing_enabled=false;
     }
+    stats.pricing_backend=gpu_pricing_enabled
+        ? indigenous::gpu::backend_name() : "CPU";
 
     for(;phase_iterations<options_.max_iterations && iterations<options_.max_iterations;
         ++phase_iterations,++iterations){

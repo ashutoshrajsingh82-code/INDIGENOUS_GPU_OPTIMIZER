@@ -1,9 +1,14 @@
 #include "gpu/vector_ops.hpp"
+#include <string>
 
 namespace indigenous::gpu {
 
 bool available() {
   return false;
+}
+
+std::string runtime_status() {
+  return "CPU fallback backend (CUDA not compiled)";
 }
 
 bool axpy(float alpha, const std::vector<float>& x, std::vector<float>& y) {

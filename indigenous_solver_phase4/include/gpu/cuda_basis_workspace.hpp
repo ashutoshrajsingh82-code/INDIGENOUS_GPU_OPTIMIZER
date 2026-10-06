@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <vector>
 
 #include "basis/basis_factorization.hpp"
 
@@ -23,6 +24,10 @@ public:
   // Uploads a factorized basis P*A=L*U to device memory.
   // This phase intentionally performs representation/upload only.
   bool initialize(const indigenous::basis::BasisFactorization& factorization);
+
+  // Solves B*x = rhs using the uploaded P*A=L*U factorization.
+  // The factorization and SpSV analysis remain resident between calls.
+  bool ftran(const std::vector<Real>& rhs, std::vector<Real>& solution);
 
   void release() noexcept;
 

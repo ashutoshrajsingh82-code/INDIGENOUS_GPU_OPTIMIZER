@@ -44,11 +44,15 @@ check_language(CUDA)
 
 if(CMAKE_CUDA_COMPILER)
   enable_language(CUDA)
-  message(STATUS "Phase 4.5 backend: CUDA toolchain detected")
+  message(STATUS "Phase 4.6 backend: CUDA toolchain detected")
+  find_package(CUDAToolkit REQUIRED)
 
   add_library(indigenous_phase4_cuda_basis src/gpu/cuda_basis_workspace.cu)
   target_include_directories(indigenous_phase4_cuda_basis
     PUBLIC include ../indigenous_solver_phase1/include
+  )
+  target_link_libraries(indigenous_phase4_cuda_basis
+    PUBLIC CUDA::cudart CUDA::cusparse
   )
   set_target_properties(indigenous_phase4_cuda_basis PROPERTIES
     CUDA_STANDARD 17
@@ -66,3 +70,4 @@ if(CMAKE_CUDA_COMPILER)
 else()
   message(STATUS "Phase 4.5 backend: CUDA toolchain unavailable; device representation target skipped")
 endif()
+

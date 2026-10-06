@@ -67,7 +67,16 @@ if(CMAKE_CUDA_COMPILER)
   )
   add_test(NAME indigenous_phase4_cuda_basis_representation
            COMMAND indigenous_phase4_cuda_basis_representation_test)
+
+  add_executable(indigenous_phase4_cuda_ftran_validation_test
+    tests/cuda_ftran_validation_test.cu
+  )
+  target_link_libraries(indigenous_phase4_cuda_ftran_validation_test
+    PRIVATE indigenous_phase4_cuda_basis indigenous_phase4_basis
+  )
+  add_test(NAME indigenous_phase4_cuda_ftran_validation
+           COMMAND indigenous_phase4_cuda_ftran_validation_test)
 else()
-  message(STATUS "Phase 4.5 backend: CUDA toolchain unavailable; device representation target skipped")
+  message(STATUS "Phase 4.6 backend: CUDA toolchain unavailable; device representation target skipped")
 endif()
 

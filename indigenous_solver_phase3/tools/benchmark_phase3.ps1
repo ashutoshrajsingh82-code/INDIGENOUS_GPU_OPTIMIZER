@@ -39,9 +39,27 @@ function Format-Metric($value) {
   return ("{0:N4}" -f [double]$value)
 }
 
+if ($RequireCuda) {
+  if (!(Test-Path $Phase3Exe)) { throw "CUDA was required, but Phase 3 executable was not found: $Phase3Exe" }
+  Write-Host "CUDA required: YES"
+  Write-Host "Performing CUDA backend preflight using afiro..."
+  $preflight = Invoke-Solver $Phase3Exe "afiro"
+  $preflightBackend = Get-OptionalText $preflight "(?m)^Pricing backend:\s*(.+)$"
+  $preflightCudaCalls = Get-OptionalMetric $preflight "(?m)^Pricing CUDA calls:\s*(.+)$"
+  $preflightCpuCalls = Get-OptionalMetric $preflight "(?m)^Pricing CPU calls:\s*(.+)$"
+  if ($preflightBackend -ne "CUDA" -or ($null -ne $preflightCudaCalls -and $preflightCudaCalls -le 0)) {
+    throw "CUDA was required but is not active. Phase 3 reported Pricing backend: $preflightBackend (CUDA calls: $preflightCudaCalls, CPU calls: $preflightCpuCalls). Rebuild Phase 3 with CUDA on an NVIDIA/CUDA machine before using -RequireCuda."
+  }
+  Write-Host "CUDA preflight: PASS (Pricing backend: $preflightBackend)"
+} else {
+  Write-Host "CUDA required: NO (CPU fallback is allowed)"
+}
+
 $rows = @()
 foreach ($model in $models) {
+  Write-Host "========================================"
   Write-Host "===== $model ====="
+  Write-Host "========================================"
   $p2 = Invoke-Solver $Phase2Exe $model
   $p3 = Invoke-Solver $Phase3Exe $model
 
@@ -62,9 +80,10 @@ foreach ($model in $models) {
   $p3BackendMode = Get-OptionalText $p3 "(?m)^Pricing backend:\s*(.+)$"
   $p3CudaCalls = Get-OptionalMetric $p3 "(?m)^Pricing CUDA calls:\s*(.+)$"
   $p3CpuCalls = Get-OptionalMetric $p3 "(?m)^Pricing CPU calls:\s*(.+)$"
-  if ($RequireCuda -and $p3BackendMode -ne "CUDA") {
+  if ($RequireCuda -and ($p3BackendMode -ne "CUDA" -or ($null -ne $p3CudaCalls -and $p3CudaCalls -le 0))) {
     throw "CUDA was required but model $model reported Pricing backend: $p3BackendMode (CUDA calls: $p3CudaCalls, CPU calls: $p3CpuCalls)."
   }
+
   $p2Iter = Get-Metric $p2 "(?m)^Iterations:\s*(.+)$" { param($v) [int]$v }
   $p3Iter = Get-Metric $p3 "(?m)^Iterations:\s*(.+)$" { param($v) [int]$v }
   $p2Cert = Get-Metric $p2 "(?m)^Certificate:\s*(.+)$" { param($v) $v }
@@ -211,14 +230,15 @@ $report += "| Phase 3 slower | $losses / $($rows.Count) |"
 $report += "| Phase 3 certificates PASS | $certPass / $($rows.Count) |"
 $report += "| CUDA required | $RequireCuda |"
 $report += "| Phase 3 CUDA calls | $(($rows | Measure-Object -Property phase3_cuda_calls -Sum).Sum) |"
+$report += "| Phase 3 CPU calls | $(($rows | Measure-Object -Property phase3_cpu_calls -Sum).Sum) |"
 $report += "| Maximum objective difference | $maxObjectiveDiff |"
 $report += ""
 $report += "## Per-model Results"
 $report += ""
-$report += "| Model | Phase 2 ms | Phase 3 ms | Speedup | P2 Pricing ms | P3 Pricing ms | P2 Backend | P3 Backend | P3 Backend Mode | P3 Selection | P3 Cert |"
-$report += "|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---|"
+$report += "| Model | Phase 2 ms | Phase 3 ms | Speedup | P2 Pricing ms | P3 Pricing ms | P2 Backend | P3 Backend | P3 Backend Mode | P3 CUDA Calls | P3 CPU Calls | P3 Selection | P3 Cert |"
+$report += "|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---|"
 foreach ($row in $rows) {
-  $report += "| $($row.model) | $([math]::Round($row.phase2_ms,4)) | $([math]::Round($row.phase3_ms,4)) | $([math]::Round($row.phase3_speedup,4))x | $([math]::Round($row.phase2_pricing_ms,4)) | $([math]::Round($row.phase3_pricing_ms,4)) | $([math]::Round($row.phase2_pricing_backend_ms,4)) | $([math]::Round($row.phase3_pricing_backend_ms,4)) | $($row.phase3_backend) | $([math]::Round($row.phase3_pricing_selection_ms,4)) | $($row.phase3_certificate) |"
+  $report += "| $($row.model) | $([math]::Round($row.phase2_ms,4)) | $([math]::Round($row.phase3_ms,4)) | $([math]::Round($row.phase3_speedup,4))x | $([math]::Round($row.phase2_pricing_ms,4)) | $([math]::Round($row.phase3_pricing_ms,4)) | $([math]::Round($row.phase2_pricing_backend_ms,4)) | $([math]::Round($row.phase3_pricing_backend_ms,4)) | $($row.phase3_backend) | $($row.phase3_cuda_calls) | $($row.phase3_cpu_calls) | $([math]::Round($row.phase3_pricing_selection_ms,4)) | $($row.phase3_certificate) |"
 }
 $report += ""
 $report += "## Interpretation"

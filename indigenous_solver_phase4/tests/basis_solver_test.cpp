@@ -1,5 +1,6 @@
 #include "gpu/basis_solver.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <vector>
@@ -49,10 +50,10 @@ int main() {
   // Expected FTRAN result is obtained from the equivalent explicit basis.
   // A = P^T * L * U.
   const std::vector<std::vector<double>> A = {
-      {4.0, 1.0, 0.0},
-      {-6.0, 6.0, 20.0},
-      {2.0, 2.0, 0.0}};
-  const std::vector<double> b{7.0, 38.0, 4.0};
+      {2.0, 1.0, 0.0},
+      {-2.0, 8.0, 17.0},
+      {4.0, 5.0, 4.0}};
+  const std::vector<double> b{3.0, -10.0, 7.0};
 
   std::vector<double> x;
   if (!workspace.ftran(b, x)) {
@@ -70,7 +71,7 @@ int main() {
   }
 
   // Verify BTRAN independently using A^T*y=c.
-  const std::vector<double> c{10.0, 8.0, 20.0};
+  const std::vector<double> c{10.0, 32.0, 46.0};
   std::vector<double> y;
   if (!workspace.btran(c, y)) {
     std::cerr << "BTRAN: FAIL

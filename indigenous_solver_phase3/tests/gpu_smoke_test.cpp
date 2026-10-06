@@ -6,6 +6,7 @@
 
 int main() {
   const bool cuda_available = indigenous::gpu::available();
+  std::cout << "Backend runtime: " << indigenous::gpu::runtime_status() << "\n";
 
   std::vector<float> x{1.0f, 2.0f, 3.0f, 4.0f};
   std::vector<float> y{10.0f, 20.0f, 30.0f, 40.0f};

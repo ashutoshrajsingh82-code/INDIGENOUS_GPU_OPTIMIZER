@@ -33,6 +33,7 @@ struct SimplexStatistics {
   double pricing_host_to_device_ms=0;
   double pricing_kernel_ms=0;
   double pricing_device_to_host_ms=0;
+  std::string pricing_backend="CPU";
   double pivot_ms=0;
   double ratio_test_ms=0;
   double basis_update_ms=0;

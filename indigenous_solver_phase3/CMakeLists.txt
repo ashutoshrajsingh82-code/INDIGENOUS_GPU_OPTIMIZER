@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
+
 project(IndigenousSolverPhase3 VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -11,24 +12,40 @@ check_language(CUDA)
 if(CMAKE_CUDA_COMPILER)
   enable_language(CUDA)
 
+  message(STATUS "==========================================")
+  message(STATUS "Phase 3 backend: CUDA enabled")
+  message(STATUS "CUDA compiler: ${CMAKE_CUDA_COMPILER}")
+  message(STATUS "CUDA compiler ID: ${CMAKE_CUDA_COMPILER_ID}")
+  message(STATUS "CUDA compiler version: ${CMAKE_CUDA_COMPILER_VERSION}")
+  if(CMAKE_CUDA_ARCHITECTURES)
+    message(STATUS "CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
+  else()
+    message(STATUS "CUDA architectures: compiler default")
+  endif()
+  message(STATUS "==========================================")
+
   add_library(indigenous_gpu_backend
     src/gpu/vector_ops.cu
     src/gpu/sparse_pricing.cu
   )
   target_include_directories(indigenous_gpu_backend PUBLIC include)
+  target_compile_definitions(indigenous_gpu_backend PUBLIC INDIGENOUS_PHASE3_CUDA=1)
   set_target_properties(indigenous_gpu_backend PROPERTIES
     CUDA_STANDARD 17
     CUDA_STANDARD_REQUIRED ON
     CUDA_EXTENSIONS OFF
   )
-  message(STATUS "Phase 3 backend: CUDA enabled")
 else()
+  message(STATUS "==========================================")
+  message(STATUS "Phase 3 backend: CUDA unavailable")
+  message(STATUS "Using CPU fallback backend")
+  message(STATUS "==========================================")
+
   add_library(indigenous_gpu_backend
     src/gpu/vector_ops_cpu.cpp
     src/gpu/sparse_pricing_cpu.cpp
   )
   target_include_directories(indigenous_gpu_backend PUBLIC include)
-  message(STATUS "Phase 3 backend: CUDA unavailable, using CPU fallback")
 endif()
 
 add_library(solver_phase3

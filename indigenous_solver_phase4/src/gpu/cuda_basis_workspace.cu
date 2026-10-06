@@ -293,11 +293,9 @@ bool CudaBasisWorkspace::initialize(
       !copy_vector(&d_upper_solve_values_, upper_solve_values) ||
       !copy_vector(&d_diagonal_, factorization.diagonal) ||
       !copy_vector(&d_permutation_, factorization.permutation) ||
-      !copy_to_device(&d_rhs_, nullptr, static_cast<std::size_t>(n) * sizeof(Real)) ||
-      !copy_to_device(&d_forward_, nullptr,
-                      static_cast<std::size_t>(n) * sizeof(Real)) ||
-      !copy_to_device(&d_solution_, nullptr,
-                      static_cast<std::size_t>(n) * sizeof(Real))) {
+      !ok(cudaMalloc(&d_rhs_, static_cast<std::size_t>(n) * sizeof(Real))) ||
+      !ok(cudaMalloc(&d_forward_, static_cast<std::size_t>(n) * sizeof(Real))) ||
+      !ok(cudaMalloc(&d_solution_, static_cast<std::size_t>(n) * sizeof(Real)))) {
     release();
     return false;
   }

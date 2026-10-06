@@ -101,10 +101,16 @@ int main() {
             << " | NNZ: " << data.values.size()
             << " | Repeats: " << repeats << "\n";
   std::cout << "CPU reference avg compute_ms: " << cpu_total_ms / repeats << "\n";
+#if defined(INDIGENOUS_PHASE3_CUDA)
+  std::cout << "Backend compiled: CUDA\n";
+#else
+  std::cout << "Backend compiled: CPU fallback\n";
+#endif
+  std::cout << "Backend runtime: " << indigenous::gpu::runtime_status() << "\n";
 
   if(!indigenous::gpu::available()) {
     std::cout << "CUDA backend: UNAVAILABLE\n";
-    std::cout << "GPU benchmark skipped (CPU fallback is active).\n";
+    std::cout << "GPU benchmark skipped because no usable CUDA device is available at runtime.\n";
     return 0;
   }
 

@@ -19,6 +19,10 @@ bool available() {
   return cudaGetDeviceCount(&count) == cudaSuccess && count > 0;
 }
 
+const char* backend_name() {
+  return available() ? "CUDA" : "CPU";
+}
+
 bool axpy(float alpha, const std::vector<float>& x, std::vector<float>& y) {
   if(x.size() != y.size()) return false;
   if(x.empty()) return true;

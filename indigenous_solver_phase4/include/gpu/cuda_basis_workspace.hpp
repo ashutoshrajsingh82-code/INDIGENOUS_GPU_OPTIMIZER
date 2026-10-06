@@ -38,6 +38,7 @@ public:
   std::size_t lower_nnz() const noexcept { return lower_nnz_; }
   std::size_t upper_nnz() const noexcept { return upper_nnz_; }
   double last_upload_ms() const noexcept { return last_upload_ms_; }
+  double last_ftran_ms() const noexcept { return last_ftran_ms_; }
 
 private:
   void* d_lower_offsets_ = nullptr;
@@ -46,6 +47,27 @@ private:
   void* d_upper_offsets_ = nullptr;
   void* d_upper_columns_ = nullptr;
   void* d_upper_values_ = nullptr;
+
+  // U with its non-unit diagonal included, used by cuSPARSE SpSV.
+  void* d_upper_solve_offsets_ = nullptr;
+  void* d_upper_solve_columns_ = nullptr;
+  void* d_upper_solve_values_ = nullptr;
+
+  void* d_rhs_ = nullptr;
+  void* d_forward_ = nullptr;
+  void* d_solution_ = nullptr;
+
+  void* cusparse_handle_ = nullptr;
+  void* lower_matrix_ = nullptr;
+  void* upper_matrix_ = nullptr;
+  void* rhs_vector_ = nullptr;
+  void* forward_vector_ = nullptr;
+  void* solution_vector_ = nullptr;
+  void* lower_spsv_ = nullptr;
+  void* upper_spsv_ = nullptr;
+  void* lower_buffer_ = nullptr;
+  void* upper_buffer_ = nullptr;
+
   void* d_diagonal_ = nullptr;
   void* d_permutation_ = nullptr;
 
@@ -53,6 +75,7 @@ private:
   std::size_t lower_nnz_ = 0;
   std::size_t upper_nnz_ = 0;
   double last_upload_ms_ = 0.0;
+  double last_ftran_ms_ = 0.0;
   bool valid_ = false;
   bool device_ready_ = false;
 };

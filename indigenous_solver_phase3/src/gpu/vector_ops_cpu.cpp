@@ -6,6 +6,10 @@ bool available() {
   return false;
 }
 
+const char* backend_name() {
+  return "CPU";
+}
+
 bool axpy(float alpha, const std::vector<float>& x, std::vector<float>& y) {
   if(x.size() != y.size()) return false;
   for(std::size_t i = 0; i < x.size(); ++i) {

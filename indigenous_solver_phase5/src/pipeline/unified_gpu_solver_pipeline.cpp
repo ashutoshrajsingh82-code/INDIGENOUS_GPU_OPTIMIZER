@@ -183,6 +183,47 @@ bool UnifiedGpuSolverPipeline::coordinate_iteration(
   return true;
 }
 
+UnifiedGpuSolverPipeline::AsyncIteration
+UnifiedGpuSolverPipeline::coordinate_iteration_async(
+    const std::vector<Real>& btran_rhs,
+    const std::vector<Real>& entering_column) {
+  auto result = std::make_shared<AsyncIterationResult>();
+
+  if (!basis_initialized_ || !pricing_initialized_ ||
+      btran_rhs.size() != workspace_.dimension() ||
+      entering_column.size() != workspace_.dimension()) {
+    return {0, result};
+  }
+
+  auto btran_copy = btran_rhs;
+  auto entering_copy = entering_column;
+  const auto task = async_engine_.submit(
+      [this, result, btran = std::move(btran_copy),
+       entering = std::move(entering_copy)]() mutable {
+        std::lock_guard<std::mutex> lock(async_operation_mutex_);
+        result->success = coordinate_iteration(
+            btran, entering, result->dual, result->reduced_costs,
+            result->direction);
+        return result->success;
+      });
+
+  return {task, result};
+}
+
+bool UnifiedGpuSolverPipeline::wait_async(AsyncIteration& operation) {
+  if (operation.task == 0 || !operation.result) return false;
+  return async_engine_.wait(operation.task) && operation.result->success;
+}
+
+bool UnifiedGpuSolverPipeline::async_ready(
+    const AsyncIteration& operation) const {
+  return operation.task != 0 && async_engine_.ready(operation.task);
+}
+
+bool UnifiedGpuSolverPipeline::wait_all_async() {
+  return async_engine_.wait_all();
+}
+
 bool UnifiedGpuSolverPipeline::initialized() const noexcept {
   return basis_initialized_ && pricing_initialized_;
 }

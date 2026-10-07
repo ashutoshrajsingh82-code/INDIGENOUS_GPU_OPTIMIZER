@@ -98,8 +98,8 @@ int main() {
             << " | BTRAN: " << report.btran_calls
             << " | Pricing: " << report.pricing_calls
             << " | FTRAN: " << report.ftran_calls << "\n";
-  std::cout << "Adaptive basis: " << report.basis_adaptive_backend()
-            << " | Adaptive pricing: " << report.pricing_adaptive_backend() << "\n";
+  std::cout << "Adaptive basis: " << report.adaptive_basis_backend
+            << " | Adaptive pricing: " << report.adaptive_pricing_backend << "\n";
   std::cout << "Basis backend: " << report.basis_backend
             << " | Pricing backend: " << report.pricing_backend
             << " | Execution: " << (report.gpu_active ? "GPU" : "CPU") << "\n";

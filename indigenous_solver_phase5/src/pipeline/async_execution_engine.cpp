@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "pipeline/async_execution_engine.hpp"
 
 namespace indigenous::pipeline {

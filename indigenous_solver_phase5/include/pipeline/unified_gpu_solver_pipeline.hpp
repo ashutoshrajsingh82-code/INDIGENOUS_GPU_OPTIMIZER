@@ -3,6 +3,7 @@
 #include <vector>
 #include "basis/simplex_basis_backend.hpp"
 #include "gpu/sparse_pricing.hpp"
+#include "pipeline/unified_gpu_workspace.hpp"
 namespace indigenous::pipeline {
 class UnifiedGpuSolverPipeline final {
 public:
@@ -15,10 +16,13 @@ public:
     const char* pricing_backend = "UNKNOWN";
     bool gpu_active = false;
     bool initialized = false;
+    bool workspace_persistent = false;
     std::size_t ftran_calls = 0;
     std::size_t btran_calls = 0;
     std::size_t pricing_calls = 0;
     std::size_t update_count = 0;
+    std::size_t workspace_allocations = 0;
+    std::size_t workspace_reuses = 0;
   };
   explicit UnifiedGpuSolverPipeline(Options options = {});
   bool initialize_basis(const SparseColumns&, Index dimension);
@@ -32,6 +36,7 @@ public:
   bool update(const std::vector<Real>& direction, Index leaving_row);
   bool initialized() const noexcept;
   bool gpu_active() const noexcept;
+  bool workspace_persistent() const noexcept;
   const char* basis_backend_name() const noexcept;
   const char* pricing_backend_name() const noexcept;
   Report report() const noexcept;
@@ -39,6 +44,7 @@ private:
   Options options_;
   basis::SimplexBasisBackend basis_;
   gpu::SparsePricingWorkspace pricing_;
+  UnifiedGpuWorkspace workspace_;
   bool basis_initialized_ = false;
   bool pricing_initialized_ = false;
   std::size_t ftran_calls_ = 0;

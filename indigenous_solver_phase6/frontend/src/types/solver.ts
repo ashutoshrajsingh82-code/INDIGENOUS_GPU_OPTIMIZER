@@ -27,6 +27,7 @@ export const navigation: SolverNavigationItem[] = [
   { id: "dashboard", label: "Dashboard", phase: "6.2", icon: "⌂" },
   { id: "models", label: "Models", phase: "6.3", icon: "▣" },
   { id: "solve", label: "Solve", phase: "6.4", icon: "▶" },
+  { id: "live", label: "Live Solver", phase: "6.6", icon: "◉" },
   { id: "results", label: "Results", phase: "6.7", icon: "◈" },
   { id: "gpu", label: "GPU Monitor", phase: "6.8", icon: "▥" },
   { id: "benchmarks", label: "Benchmarks", phase: "6.9", icon: "↗" },

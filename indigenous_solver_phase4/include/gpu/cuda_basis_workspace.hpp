@@ -29,6 +29,10 @@ public:
   // The factorization and SpSV analysis remain resident between calls.
   bool ftran(const std::vector<Real>& rhs, std::vector<Real>& solution);
 
+  // Solves B^T*x = rhs using the uploaded P*A=L*U factorization.
+  // The factorization and SpSV analysis remain resident between calls.
+  bool btran(const std::vector<Real>& rhs, std::vector<Real>& solution);
+
   void release() noexcept;
 
   bool valid() const noexcept { return valid_; }
@@ -56,6 +60,8 @@ private:
   void* d_rhs_ = nullptr;
   void* d_forward_ = nullptr;
   void* d_solution_ = nullptr;
+  void* d_transpose_rhs_ = nullptr;
+  void* d_transpose_forward_ = nullptr;
 
   void* cusparse_handle_ = nullptr;
   void* lower_matrix_ = nullptr;
@@ -65,8 +71,12 @@ private:
   void* solution_vector_ = nullptr;
   void* lower_spsv_ = nullptr;
   void* upper_spsv_ = nullptr;
+  void* lower_transpose_spsv_ = nullptr;
+  void* upper_transpose_spsv_ = nullptr;
   void* lower_buffer_ = nullptr;
   void* upper_buffer_ = nullptr;
+  void* lower_transpose_buffer_ = nullptr;
+  void* upper_transpose_buffer_ = nullptr;
 
   void* d_diagonal_ = nullptr;
   void* d_permutation_ = nullptr;
@@ -76,6 +86,7 @@ private:
   std::size_t upper_nnz_ = 0;
   double last_upload_ms_ = 0.0;
   double last_ftran_ms_ = 0.0;
+  double last_btran_ms_ = 0.0;
   bool valid_ = false;
   bool device_ready_ = false;
 };

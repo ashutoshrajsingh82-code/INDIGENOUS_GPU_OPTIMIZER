@@ -59,6 +59,18 @@ bool UnifiedGpuSolverPipeline::initialize_pricing(
   pricing_rows_ = rows;
   pricing_values_ = values;
   pricing_objective_ = objective;
+
+  // Pricing can be used independently of basis initialization (for example,
+  // during the Phase 5.11 production preflight). In that case the persistent
+  // workspace still needs the model row dimension so price() can validate the
+  // dual vector correctly.
+  std::size_t pricing_dimension = 0;
+  for (const auto row : rows)
+    pricing_dimension = std::max(pricing_dimension, row + 1);
+
+  if (!workspace_.initialize(pricing_dimension))
+    return false;
+
   pricing_initialized_ = pricing_.initialize(offsets, rows, values, objective);
   if (!pricing_initialized_) return false;
   return workspace_.ensure(UnifiedGpuWorkspace::BufferKind::Pricing,

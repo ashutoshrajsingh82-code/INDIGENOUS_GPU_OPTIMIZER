@@ -104,3 +104,9 @@ export function getSolveResult(jobId: string): Promise<SolveResultResponse> {
 export function getRuntimeSnapshot(): Promise<RuntimeSnapshot> {
   return request<RuntimeSnapshot>("/runtime");
 }
+
+
+import type { BenchmarkSnapshot } from "../types/benchmark";
+export function getBenchmarkSnapshot(): Promise<BenchmarkSnapshot> {
+  return request<BenchmarkSnapshot>("/benchmarks");
+}

@@ -285,6 +285,18 @@ UnifiedGpuSolverPipeline::Report UnifiedGpuSolverPipeline::report() const noexce
   result.adaptive_basis_backend = basis_decision_.backend;
   result.adaptive_pricing_backend = pricing_decision_.backend;
   result.adaptive_decisions = adaptive_decisions_;
+
+  const auto async_report = async_engine_.report();
+  result.async_submitted = async_report.submitted;
+  result.async_completed = async_report.completed;
+  result.async_in_flight = async_report.in_flight;
+  result.async_available = async_report.asynchronous;
+  // Phase 5.5 owns the asynchronous dispatch boundary. CUDA-capable async
+  // execution is only reported when the underlying pipeline is actually
+  // running a CUDA backend; CPU async must never masquerade as GPU execution.
+  result.async_gpu_capable = gpu_active();
+  result.async_backend = gpu_active() ? "CUDA-ASYNC" : "CPU-ASYNC";
+
   return result;
 }
 

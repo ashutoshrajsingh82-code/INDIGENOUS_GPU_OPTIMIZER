@@ -27,8 +27,13 @@ export interface SolveRequest {
 
 export interface SolveResponse {
   jobId: string;
+  modelId?: string;
   status: "queued" | "running" | "optimal" | "infeasible" | "unbounded" | "iteration_limit" | "error";
   message: string;
+  progress?: number;
+  iteration?: number;
+  objective?: number | null;
+  elapsedMs?: number;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

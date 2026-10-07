@@ -463,7 +463,7 @@ SparseWorkloadPlanner::Plan UnifiedGpuSolverPipeline::large_scale_plan() const n
 }
 
 NumericalStabilityGuard::Result UnifiedGpuSolverPipeline::validate_result(
-    const std::vector<Real>& values) const noexcept {
+    const std::vector<Real>& values) noexcept {
   const auto result = stability_guard_.validate_vector(values);
   ++numerical_checks_;
   if (!result.valid) {

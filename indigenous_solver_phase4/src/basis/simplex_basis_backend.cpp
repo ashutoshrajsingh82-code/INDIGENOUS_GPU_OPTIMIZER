@@ -5,11 +5,9 @@
 namespace indigenous::basis {
 
 SimplexBasisBackend::SimplexBasisBackend(Options options)
-    : options_(options), cpu_(make_cpu_basis_solver()) {
-  // CUDA basis execution is introduced behind the same interface in the
-  // CUDA-enabled build. Until live GPU basis updates are implemented, the
-  // portable CPU reference remains the correctness fallback.
-  active_ = make_cpu_basis_solver();
+    : options_(options),
+      active_(make_cpu_basis_solver()),
+      cpu_(make_cpu_basis_solver()) {
   gpu_active_ = false;
 }
 
@@ -21,7 +19,7 @@ bool SimplexBasisBackend::initialize(const BasisSolver::SparseColumns& basis_col
   if (!cpu_) cpu_ = make_cpu_basis_solver();
   if (!active_->initialize(basis_columns, dimension, options_.pivot_tolerance))
     return false;
-  if (active_ != cpu_)
+  if (cpu_ && cpu_.get() != active_.get())
     cpu_->initialize(basis_columns, dimension, options_.pivot_tolerance);
   return true;
 }
@@ -58,10 +56,10 @@ bool SimplexBasisBackend::update(
 
 bool SimplexBasisBackend::activate_cpu() {
   if (active_ == cpu_) return true;
-  if (!cpu_) cpu_ = make_cpu_basis_solver();
+  if (!cpu_) return false;
   if (!cpu_->initialize(basis_columns_, dimension_, options_.pivot_tolerance))
     return false;
-  active_ = cpu_.get() == active_.get() ? std::move(active_) : std::move(cpu_);
+  active_ = std::move(cpu_);
   gpu_active_ = false;
   return active_ != nullptr;
 }

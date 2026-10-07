@@ -60,8 +60,6 @@ private:
   void* d_rhs_ = nullptr;
   void* d_forward_ = nullptr;
   void* d_solution_ = nullptr;
-  void* d_transpose_rhs_ = nullptr;
-  void* d_transpose_forward_ = nullptr;
 
   void* cusparse_handle_ = nullptr;
   void* lower_matrix_ = nullptr;

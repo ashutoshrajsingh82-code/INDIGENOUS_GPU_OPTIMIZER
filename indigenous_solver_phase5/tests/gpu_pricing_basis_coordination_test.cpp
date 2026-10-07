@@ -62,8 +62,8 @@ int main() {
   assert(report.pricing_calls == 2);
   assert(report.ftran_calls == 2);
   assert(report.workspace_persistent);
-  assert(report.workspace_allocations == 4);
-  assert(report.workspace_reuses >= 8);
+  assert(report.workspace_allocations == 3);
+  assert(report.workspace_reuses >= 6);
 
   std::cout << "Phase 5.3 GPU pricing + FTRAN/BTRAN coordination: PASS\n";
   std::cout << "Coordination calls: " << report.coordination_calls

@@ -5,6 +5,7 @@ import type { SolverConfiguration } from "./types/solverConfig";
 import { defaultSolverConfiguration } from "./types/solverConfig";
 import { SolverConfigurationPanel } from "./components/SolverConfigurationPanel";
 import { LiveSolver } from "./components/LiveSolver";
+import { ResultsExplorer } from "./components/ResultsExplorer";
 import { navigation, runtimeStatus, type SolverNavigationItem } from "./types/solver";
 import "./styles.css";
 
@@ -12,6 +13,7 @@ function App() {
   const [active, setActive] = useState<SolverNavigationItem["id"]>("dashboard");
   const [uploadedModel, setUploadedModel] = useState<UploadedModel | null>(null);
   const [solverConfiguration, setSolverConfiguration] = useState<SolverConfiguration>(defaultSolverConfiguration);
+  const [lastJobId, setLastJobId] = useState<string | null>(null);
   const activeItem = useMemo(
     () => navigation.find((item) => item.id === active) ?? navigation[0],
     [active],
@@ -40,7 +42,7 @@ function App() {
           <div className="runtime-pill"><span className="status-dot" /> {runtimeStatus.backend} · CPU FALLBACK</div>
         </header>
 
-        {active === "dashboard" ? <Dashboard onNavigate={setActive} /> : active === "models" ? <ModelsView model={uploadedModel} onModelReady={setUploadedModel} /> : active === "solve" ? <SolveConfigurationView config={solverConfiguration} onChange={setSolverConfiguration} /> : active === "live" ? <LiveSolver model={uploadedModel} config={solverConfiguration} /> : <Placeholder label={activeItem.label} />}
+        {active === "dashboard" ? <Dashboard onNavigate={setActive} /> : active === "models" ? <ModelsView model={uploadedModel} onModelReady={setUploadedModel} /> : active === "solve" ? <SolveConfigurationView config={solverConfiguration} onChange={setSolverConfiguration} /> : active === "live" ? <LiveSolver model={uploadedModel} config={solverConfiguration} onJobCreated={setLastJobId} /> : active === "results" ? <ResultsExplorer jobId={lastJobId} /> : <Placeholder label={activeItem.label} />}
 
         <footer className="footer">Indigenous GPU Optimizer · React/Vite foundation · Solver logic remains authoritative in C++</footer>
       </main>

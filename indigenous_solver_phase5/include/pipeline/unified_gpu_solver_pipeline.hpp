@@ -1,10 +1,13 @@
 #pragma once
 #include <cstddef>
+#include <memory>
+#include <mutex>
 #include <vector>
 #include "basis/simplex_basis_backend.hpp"
 #include "gpu/sparse_pricing.hpp"
 #include "pipeline/unified_gpu_workspace.hpp"
 #include "pipeline/adaptive_backend_selector.hpp"
+#include "pipeline/async_execution_engine.hpp"
 
 namespace indigenous::pipeline {
 
@@ -40,6 +43,12 @@ public:
     std::size_t workspace_allocations = 0;
     std::size_t workspace_reuses = 0;
     std::size_t adaptive_decisions = 0;
+    std::size_t async_submitted = 0;
+    std::size_t async_completed = 0;
+    std::size_t async_in_flight = 0;
+    bool async_available = true;
+    bool async_gpu_capable = false;
+    const char* async_backend = "CPU-ASYNC";
   };
 
   explicit UnifiedGpuSolverPipeline(Options options = {});
@@ -85,6 +94,29 @@ public:
   const char* pricing_backend_name() const noexcept;
   const char* basis_adaptive_backend() const noexcept;
   const char* pricing_adaptive_backend() const noexcept;
+  struct AsyncIterationResult {
+    bool success = false;
+    std::vector<Real> dual;
+    std::vector<Real> reduced_costs;
+    std::vector<Real> direction;
+  };
+
+  struct AsyncIteration {
+    AsyncExecutionEngine::TaskId task = 0;
+    std::shared_ptr<AsyncIterationResult> result;
+  };
+
+  // Dispatches one complete BTRAN -> pricing -> FTRAN iteration without
+  // blocking the caller. The shared persistent workspace is serialized
+  // internally so asynchronous submission cannot race the reusable buffers.
+  AsyncIteration coordinate_iteration_async(
+      const std::vector<Real>& btran_rhs,
+      const std::vector<Real>& entering_column);
+
+  bool wait_async(AsyncIteration& operation);
+  bool async_ready(const AsyncIteration& operation) const;
+  bool wait_all_async();
+
   Report report() const noexcept;
 
 private:
@@ -102,6 +134,8 @@ private:
   std::size_t pricing_calls_ = 0;
   std::size_t coordination_calls_ = 0;
   std::size_t adaptive_decisions_ = 0;
+  AsyncExecutionEngine async_engine_;
+  mutable std::mutex async_operation_mutex_;
 };
 
 }  // namespace indigenous::pipeline

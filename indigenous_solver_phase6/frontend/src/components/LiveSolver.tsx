@@ -4,14 +4,14 @@ import type { SolverConfiguration } from "../types/solverConfig";
 import { getSolveStatus, solveModel } from "../services/api";
 import type { SolveJob, SolveJobStatus } from "../types/solve";
 
-interface Props { model: UploadedModel | null; config: SolverConfiguration; }
+interface Props { model: UploadedModel | null; config: SolverConfiguration; onJobCreated?: (jobId: string) => void; }
 
 const initialJob: SolveJob = {
   jobId: null, modelId: null, status: "idle", message: "Ready to start a solve.",
   startedAt: null, updatedAt: null, configuration: null,
 };
 
-export function LiveSolver({ model, config }: Props) {
+export function LiveSolver({ model, config, onJobCreated }: Props) {
   const [job, setJob] = useState<SolveJob>(initialJob);
   const [progress, setProgress] = useState(0);
   const [iteration, setIteration] = useState<number | null>(null);
@@ -49,6 +49,7 @@ export function LiveSolver({ model, config }: Props) {
     try {
       const response = await solveModel({ modelId: (model as UploadedModel & { modelId?: string }).modelId ?? "", configuration: config });
       setJob({ jobId: response.jobId, modelId: response.modelId ?? null, status: response.status, message: response.message, startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), configuration: config });
+      onJobCreated?.(response.jobId);
       if (response.status === "queued" || response.status === "running") poll(response.jobId);
     } catch (err) {
       setJob((current) => ({ ...current, status: "error", message: err instanceof Error ? err.message : "Solver submission failed.", updatedAt: new Date().toISOString() }));

@@ -8,6 +8,7 @@
 #include "pipeline/unified_gpu_workspace.hpp"
 #include "pipeline/adaptive_backend_selector.hpp"
 #include "pipeline/async_execution_engine.hpp"
+#include "pipeline/sparse_workload_planner.hpp"
 
 namespace indigenous::pipeline {
 
@@ -20,6 +21,9 @@ public:
   struct Options {
     bool prefer_gpu = true;
     Real pivot_tolerance = 1e-12;
+    std::size_t memory_budget_bytes = 256ULL * 1024ULL * 1024ULL;
+    std::size_t preferred_batch_vectors = 32;
+    std::size_t max_batch_vectors = 256;
   };
 
   struct Report {
@@ -53,6 +57,15 @@ public:
     std::size_t batch_vectors_processed = 0;
     bool batch_available = true;
     const char* batch_backend = "CPU-BATCH";
+    std::size_t sparse_rows = 0;
+    std::size_t sparse_columns = 0;
+    std::size_t sparse_nonzeros = 0;
+    const char* sparse_scale = "SMALL";
+    bool sparse_large_scale = false;
+    std::size_t estimated_csc_bytes = 0;
+    std::size_t recommended_batch_vectors = 1;
+    std::size_t chunk_columns = 1;
+    const char* sparse_strategy = "direct sparse CPU";
   };
 
   explicit UnifiedGpuSolverPipeline(Options options = {});
@@ -152,11 +165,16 @@ public:
       const VectorBatch& entering_column_batch,
       BatchIterationResult& result);
 
+  SparseWorkloadPlanner::Plan large_scale_plan() const noexcept;
+
   Report report() const noexcept;
 
 private:
   Options options_;
   AdaptiveBackendSelector adaptive_selector_;
+  SparseWorkloadPlanner sparse_planner_;
+  SparseWorkloadPlanner::ModelStats sparse_stats_;
+  SparseWorkloadPlanner::Plan sparse_plan_;
   AdaptiveBackendSelector::Decision basis_decision_;
   AdaptiveBackendSelector::Decision pricing_decision_;
   basis::SimplexBasisBackend basis_;

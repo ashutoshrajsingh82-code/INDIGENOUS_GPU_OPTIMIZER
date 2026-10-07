@@ -4,6 +4,10 @@
 
 #include <sstream>
 
+#ifndef INDIGENOUS_PHASE4_CUDA_COMPILED
+#define INDIGENOUS_PHASE4_CUDA_COMPILED 0
+#endif
+
 namespace indigenous::basis {
 
 BackendReport make_backend_report(const SimplexBasisBackend& backend) {
@@ -15,7 +19,7 @@ BackendReport make_backend_report(const SimplexBasisBackend& backend) {
 
   // Capability and active execution are deliberately separate. A CPU-only
   // build must never imply that CUDA work occurred.
-  report.cuda_compiled = false;
+  report.cuda_compiled = INDIGENOUS_PHASE4_CUDA_COMPILED != 0;
   report.device_ready = false;
   return report;
 }

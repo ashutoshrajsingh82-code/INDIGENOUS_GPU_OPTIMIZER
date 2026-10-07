@@ -29,6 +29,7 @@ public:
 
   explicit NumericalStabilityGuard(Options options = {}) : options_(options) {}
 
+  Result validate_input(const std::vector<double>& values) const noexcept;
   Result validate_vector(const std::vector<double>& values) const noexcept;
 
   Result validate_residual(const std::vector<double>& lhs,

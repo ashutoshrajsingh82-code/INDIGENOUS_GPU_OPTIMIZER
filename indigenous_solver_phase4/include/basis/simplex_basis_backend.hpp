@@ -47,6 +47,8 @@ private:
   Options options_;
   std::unique_ptr<BasisSolver> active_;
   std::unique_ptr<BasisSolver> cpu_;
+  BasisSolver::SparseColumns basis_columns_;
+  BasisSolver::Index dimension_ = 0;
   bool gpu_active_ = false;
 };
 

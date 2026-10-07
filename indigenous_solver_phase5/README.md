@@ -45,3 +45,40 @@ Phase 5.3 separates:
 This avoids incorrectly reporting the entire pipeline as CPU when pricing is on CUDA but the basis backend is still CPU.
 
 Phase 5.3 still does not replace the Phase 2 RevisedSimplex iteration loop. It provides the backend-neutral coordinated linear-algebra path that a later production integration stage can call.
+
+## Phase 5.4: Adaptive CPU/GPU Workload Selection
+Phase 5.4 adds an explicit workload-aware backend policy above the Phase 5.1-5.3 orchestration layer.
+
+### Selection policy
+The adaptive selector considers:
+- whether a CUDA-capable device is actually available at runtime,
+- whether GPU preference is enabled,
+- problem dimension,
+- sparse nonzero count,
+- an estimated operation workload.
+
+Small or sparse workloads stay on CPU to avoid GPU launch, transfer, and synchronization overhead. Larger workloads are eligible for GPU execution when CUDA is genuinely available.
+
+Default thresholds are:
+- minimum dimension: 256,
+- minimum nonzeros: 4096,
+- minimum estimated work: 1,000,000.
+
+The thresholds are policy values, not correctness requirements. They can be changed through AdaptiveBackendSelector::Options.
+
+### Reporting
+The pipeline now reports both:
+- the backend that is actually executing, and
+- the adaptive backend recommendation.
+
+This distinction is intentional. Phase 5.4 does not falsely claim GPU execution on a machine without an NVIDIA/CUDA device.
+
+On the current Intel-only machine:
+- CUDA availability is false,
+- basis adaptive recommendation is CPU,
+- pricing adaptive recommendation is CPU,
+- aggregate adaptive GPU eligibility is false.
+
+On an NVIDIA/CUDA machine, large workloads can be recommended for GPU while small workloads remain on CPU.
+
+Phase 5.4 remains a backend-selection policy layer; later phases can use these decisions for asynchronous execution, batching, and production routing.

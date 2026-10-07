@@ -88,14 +88,13 @@ bool UnifiedGpuSolverPipeline::btran_and_price(
       btran_rhs.size() != workspace_.dimension())
     return false;
 
-  std::vector<Real> local_dual;
-  if (!btran(btran_rhs, local_dual)) {
+  if (!btran(btran_rhs, workspace_.btran_buffer())) {
     dual.clear();
     reduced_costs.clear();
     return false;
   }
 
-  if (!price(local_dual, reduced_costs)) {
+  if (!price(workspace_.btran_buffer(), reduced_costs)) {
     dual.clear();
     reduced_costs.clear();
     return false;

@@ -31,11 +31,11 @@ public:
 
   void record(Stage stage, double elapsed_ms) noexcept;
   Report report() const noexcept;
-  void set_backend(const char* backend) noexcept;
+  void set_backend(const char* backend) const noexcept;
   static const char* stage_name(Stage stage) noexcept;
 private:
   StageStats stats_[6]{};
-  const char* backend_ = "CPU";
+  mutable const char* backend_ = "CPU";
   static StageStats& at(StageStats* stats, Stage stage) noexcept;
   static const StageStats& at(const StageStats* stats, Stage stage) noexcept;
 };

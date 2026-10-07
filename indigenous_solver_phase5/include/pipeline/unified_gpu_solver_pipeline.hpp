@@ -9,6 +9,7 @@
 #include "pipeline/adaptive_backend_selector.hpp"
 #include "pipeline/async_execution_engine.hpp"
 #include "pipeline/sparse_workload_planner.hpp"
+#include "pipeline/numerical_stability_guard.hpp"
 
 namespace indigenous::pipeline {
 
@@ -24,6 +25,9 @@ public:
     std::size_t memory_budget_bytes = 256ULL * 1024ULL * 1024ULL;
     std::size_t preferred_batch_vectors = 32;
     std::size_t max_batch_vectors = 256;
+    double numerical_relative_tolerance = 1e-9;
+    double numerical_absolute_tolerance = 1e-12;
+    bool enable_numerical_fallback = true;
   };
 
   struct Report {
@@ -66,6 +70,13 @@ public:
     std::size_t recommended_batch_vectors = 1;
     std::size_t chunk_columns = 1;
     const char* sparse_strategy = "direct sparse CPU";
+    bool numerical_stable = true;
+    bool fallback_active = false;
+    std::size_t numerical_checks = 0;
+    std::size_t numerical_failures = 0;
+    std::size_t fallback_count = 0;
+    double maximum_residual = 0.0;
+    const char* last_numerical_failure = "NONE";
   };
 
   explicit UnifiedGpuSolverPipeline(Options options = {});
@@ -166,6 +177,8 @@ public:
       BatchIterationResult& result);
 
   SparseWorkloadPlanner::Plan large_scale_plan() const noexcept;
+  NumericalStabilityGuard::Result validate_result(const std::vector<Real>& values) noexcept;
+  bool numerical_stable() const noexcept;
 
   Report report() const noexcept;
 
@@ -175,6 +188,13 @@ private:
   SparseWorkloadPlanner sparse_planner_;
   SparseWorkloadPlanner::ModelStats sparse_stats_;
   SparseWorkloadPlanner::Plan sparse_plan_;
+  NumericalStabilityGuard stability_guard_;
+  bool numerical_stable_ = true;
+  std::size_t numerical_checks_ = 0;
+  std::size_t numerical_failures_ = 0;
+  std::size_t fallback_count_ = 0;
+  double maximum_residual_ = 0.0;
+  const char* last_numerical_failure_ = "NONE";
   AdaptiveBackendSelector::Decision basis_decision_;
   AdaptiveBackendSelector::Decision pricing_decision_;
   basis::SimplexBasisBackend basis_;
@@ -191,6 +211,11 @@ private:
   mutable std::mutex async_operation_mutex_;
   std::size_t batch_calls_ = 0;
   std::size_t batch_vectors_processed_ = 0;
+  std::vector<std::size_t> pricing_offsets_;
+  std::vector<std::size_t> pricing_rows_;
+  std::vector<Real> pricing_values_;
+  std::vector<Real> pricing_objective_;
+  bool cpu_fallback_required_ = false;
 };
 
 }  // namespace indigenous::pipeline

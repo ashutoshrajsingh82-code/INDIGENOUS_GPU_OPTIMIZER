@@ -11,6 +11,7 @@ add_library(indigenous_phase5_pipeline
   src/pipeline/adaptive_backend_selector.cpp
   src/pipeline/async_execution_engine.cpp
   src/pipeline/sparse_workload_planner.cpp
+  src/pipeline/numerical_stability_guard.cpp
 )
 target_include_directories(indigenous_phase5_pipeline PUBLIC include ../indigenous_solver_phase4/include ../indigenous_solver_phase3/include)
 target_link_libraries(indigenous_phase5_pipeline PUBLIC indigenous_phase4_basis indigenous_gpu_backend)
@@ -67,3 +68,11 @@ target_link_libraries(indigenous_phase5_large_scale_sparse_test
 add_test(NAME indigenous_phase5_large_scale_sparse
   COMMAND indigenous_phase5_large_scale_sparse_test)
 message(STATUS "Phase 5.7 large-scale sparse optimization: memory-aware sparse planning and bounded batching")
+
+add_executable(indigenous_phase5_numerical_stability_test
+  tests/numerical_stability_pipeline_test.cpp)
+target_link_libraries(indigenous_phase5_numerical_stability_test
+  PRIVATE indigenous_phase5_pipeline)
+add_test(NAME indigenous_phase5_numerical_stability
+  COMMAND indigenous_phase5_numerical_stability_test)
+message(STATUS "Phase 5.8 numerical stability: finite-value guards, recovery and safe fallback")

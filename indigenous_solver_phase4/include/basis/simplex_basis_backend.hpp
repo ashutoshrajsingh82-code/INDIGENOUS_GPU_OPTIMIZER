@@ -36,6 +36,10 @@ public:
   bool update(const std::vector<BasisSolver::Real>& direction,
               BasisSolver::Index leaving_row);
 
+  // Switches to the CPU reference basis and rebuilds its factors from the
+  // last initialized basis representation. Safe for numerical recovery.
+  bool recover_cpu();
+
   bool valid() const noexcept;
   const char* backend_name() const noexcept;
   bool gpu_active() const noexcept;

@@ -54,6 +54,10 @@ bool SimplexBasisBackend::update(
   return false;
 }
 
+bool SimplexBasisBackend::recover_cpu() {
+  return activate_cpu();
+}
+
 bool SimplexBasisBackend::activate_cpu() {
   if (active_ == cpu_) return true;
   if (!cpu_) return false;

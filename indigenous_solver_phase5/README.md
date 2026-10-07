@@ -202,3 +202,42 @@ execution.
 
 Phase 5.7 is therefore an optimization-planning and memory-bounding stage,
 not yet a claim of end-to-end large-model GPU acceleration.
+
+
+## Phase 5.8: Numerical Stability and Fallback Mechanisms
+Phase 5.8 adds a fail-closed numerical safety layer around the unified
+pipeline.
+
+### Numerical guards
+`NumericalStabilityGuard` detects:
+- NaN/Inf inputs,
+- NaN/Inf operation outputs,
+- excessive residuals relative to configurable absolute/relative tolerances.
+
+The pipeline records numerical checks, failures, maximum observed residual,
+and the last failure classification.
+
+### Controlled CPU recovery
+When a CUDA basis operation produces an invalid numerical result and
+fallback is enabled, the Phase 4 CPU reference basis is rebuilt and the
+operation is retried. Pricing retains its immutable CSC/objective inputs and
+can recompute reduced costs on the CPU if the active pricing result fails
+numerical validation.
+
+A successful recovery increments the fallback counter. An unrecoverable
+failure returns false rather than allowing invalid values to propagate into
+simplex state.
+
+### Reporting
+Phase 5.8 exposes:
+- numerical stability status,
+- fallback activity,
+- numerical check count,
+- numerical failure count,
+- fallback count,
+- maximum observed residual,
+- last numerical failure classification.
+
+The current Intel-only machine continues to execute CPU paths, so CUDA
+fallback recovery cannot be runtime-demonstrated locally. The safety path is
+implemented and CPU validation covers finite-value rejection and accounting.

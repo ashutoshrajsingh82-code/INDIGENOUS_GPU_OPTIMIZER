@@ -1,5 +1,8 @@
 #include "pipeline/unified_gpu_solver_pipeline.hpp"
 
+#include <algorithm>
+#include <cmath>
+
 namespace indigenous::pipeline {
 
 UnifiedGpuSolverPipeline::UnifiedGpuSolverPipeline(Options options)
@@ -8,6 +11,8 @@ UnifiedGpuSolverPipeline::UnifiedGpuSolverPipeline(Options options)
       sparse_planner_({options.memory_budget_bytes,
                        options.preferred_batch_vectors,
                        options.max_batch_vectors}),
+      stability_guard_({options.numerical_relative_tolerance,
+                        options.numerical_absolute_tolerance}),
       basis_({options.prefer_gpu, options.pivot_tolerance}) {}
 
 bool UnifiedGpuSolverPipeline::initialize_basis(
@@ -50,6 +55,10 @@ bool UnifiedGpuSolverPipeline::initialize_pricing(
   sparse_stats_.columns = offsets.empty() ? 0 : offsets.size() - 1;
   sparse_stats_.nonzeros = values.size();
   sparse_plan_ = sparse_planner_.plan(sparse_stats_);
+  pricing_offsets_ = offsets;
+  pricing_rows_ = rows;
+  pricing_values_ = values;
+  pricing_objective_ = objective;
   pricing_initialized_ = pricing_.initialize(offsets, rows, values, objective);
   if (!pricing_initialized_) return false;
   return workspace_.ensure(UnifiedGpuWorkspace::BufferKind::Pricing,
@@ -61,9 +70,26 @@ bool UnifiedGpuSolverPipeline::ftran(
   if (!basis_initialized_ || rhs.size() != workspace_.dimension() ||
       !workspace_.ensure(UnifiedGpuWorkspace::BufferKind::Ftran, rhs.size()))
     return false;
+  if (!stability_guard_.validate_input(rhs).valid) {
+    ++numerical_checks_;
+    numerical_stable_ = false;
+    ++numerical_failures_;
+    last_numerical_failure_ = "NONFINITE_INPUT";
+    return false;
+  }
 
   auto& buffer = workspace_.ftran_buffer();
   if (!basis_.ftran(rhs, buffer)) return false;
+  const auto check = validate_result(buffer);
+  if (!check.valid) {
+    if (options_.enable_numerical_fallback && basis_.gpu_active()) {
+      if (basis_.recover_cpu() && basis_.ftran(rhs, buffer)) {
+        const auto retry = validate_result(buffer);
+        if (retry.valid) { ++fallback_count_; solution = buffer; return true; }
+      }
+    }
+    return false;
+  }
   solution = buffer;
   ++ftran_calls_;
   return true;
@@ -74,9 +100,26 @@ bool UnifiedGpuSolverPipeline::btran(
   if (!basis_initialized_ || rhs.size() != workspace_.dimension() ||
       !workspace_.ensure(UnifiedGpuWorkspace::BufferKind::Btran, rhs.size()))
     return false;
+  if (!stability_guard_.validate_input(rhs).valid) {
+    ++numerical_checks_;
+    numerical_stable_ = false;
+    ++numerical_failures_;
+    last_numerical_failure_ = "NONFINITE_INPUT";
+    return false;
+  }
 
   auto& buffer = workspace_.btran_buffer();
   if (!basis_.btran(rhs, buffer)) return false;
+  const auto check = validate_result(buffer);
+  if (!check.valid) {
+    if (options_.enable_numerical_fallback && basis_.gpu_active()) {
+      if (basis_.recover_cpu() && basis_.btran(rhs, buffer)) {
+        const auto retry = validate_result(buffer);
+        if (retry.valid) { ++fallback_count_; solution = buffer; return true; }
+      }
+    }
+    return false;
+  }
   solution = buffer;
   ++btran_calls_;
   return true;
@@ -85,12 +128,33 @@ bool UnifiedGpuSolverPipeline::btran(
 bool UnifiedGpuSolverPipeline::price(
     const std::vector<Real>& dual, std::vector<Real>& reduced_costs) {
   if (!pricing_initialized_ || dual.size() != workspace_.dimension()) return false;
+  if (!stability_guard_.validate_input(dual).valid) {
+    ++numerical_checks_;
+    numerical_stable_ = false;
+    ++numerical_failures_;
+    last_numerical_failure_ = "NONFINITE_INPUT";
+    return false;
+  }
 
   auto& buffer = workspace_.pricing_buffer();
   if (!workspace_.ensure(UnifiedGpuWorkspace::BufferKind::Pricing,
                          pricing_.valid() ? buffer.size() : 0))
     return false;
   if (!pricing_.compute(dual, buffer)) return false;
+  const auto check = validate_result(buffer);
+  if (!check.valid) {
+    if (options_.enable_numerical_fallback &&
+        !pricing_offsets_.empty() && !pricing_objective_.empty()) {
+      reduced_costs = pricing_objective_;
+      for (std::size_t j = 0; j < pricing_objective_.size(); ++j) {
+        for (std::size_t p = pricing_offsets_[j]; p < pricing_offsets_[j + 1]; ++p)
+          reduced_costs[j] -= pricing_values_[p] * dual[pricing_rows_[p]];
+      }
+      const auto retry = validate_result(reduced_costs);
+      if (retry.valid) { ++fallback_count_; return true; }
+    }
+    return false;
+  }
   reduced_costs = buffer;
   ++pricing_calls_;
   return true;
@@ -398,6 +462,24 @@ SparseWorkloadPlanner::Plan UnifiedGpuSolverPipeline::large_scale_plan() const n
   return sparse_plan_;
 }
 
+NumericalStabilityGuard::Result UnifiedGpuSolverPipeline::validate_result(
+    const std::vector<Real>& values) noexcept {
+  const auto result = stability_guard_.validate_vector(values);
+  ++numerical_checks_;
+  if (!result.valid) {
+    numerical_stable_ = false;
+    ++numerical_failures_;
+    last_numerical_failure_ =
+        NumericalStabilityGuard::failure_name(result.failure);
+  }
+  maximum_residual_ = std::max(maximum_residual_, result.residual);
+  return result;
+}
+
+bool UnifiedGpuSolverPipeline::numerical_stable() const noexcept {
+  return numerical_stable_;
+}
+
 UnifiedGpuSolverPipeline::Report UnifiedGpuSolverPipeline::report() const noexcept {
   const auto workspace_report = workspace_.report();
 
@@ -462,6 +544,13 @@ UnifiedGpuSolverPipeline::Report UnifiedGpuSolverPipeline::report() const noexce
   result.recommended_batch_vectors = sparse_plan_.recommended_batch_vectors;
   result.chunk_columns = sparse_plan_.chunk_columns;
   result.sparse_strategy = sparse_plan_.strategy;
+  result.numerical_stable = numerical_stable_;
+  result.fallback_active = cpu_fallback_required_ || fallback_count_ > 0;
+  result.numerical_checks = numerical_checks_;
+  result.numerical_failures = numerical_failures_;
+  result.fallback_count = fallback_count_;
+  result.maximum_residual = maximum_residual_;
+  result.last_numerical_failure = last_numerical_failure_;
 
   return result;
 }

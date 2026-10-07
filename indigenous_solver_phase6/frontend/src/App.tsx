@@ -1,12 +1,16 @@
 import { useMemo, useState } from "react";
 import { ModelUpload } from "./components/ModelUpload";
 import type { UploadedModel } from "./types/model";
+import type { SolverConfiguration } from "./types/solverConfig";
+import { defaultSolverConfiguration } from "./types/solverConfig";
+import { SolverConfigurationPanel } from "./components/SolverConfigurationPanel";
 import { navigation, runtimeStatus, type SolverNavigationItem } from "./types/solver";
 import "./styles.css";
 
 function App() {
   const [active, setActive] = useState<SolverNavigationItem["id"]>("dashboard");
   const [uploadedModel, setUploadedModel] = useState<UploadedModel | null>(null);
+  const [solverConfiguration, setSolverConfiguration] = useState<SolverConfiguration>(defaultSolverConfiguration);
   const activeItem = useMemo(
     () => navigation.find((item) => item.id === active) ?? navigation[0],
     [active],
@@ -35,7 +39,7 @@ function App() {
           <div className="runtime-pill"><span className="status-dot" /> {runtimeStatus.backend} · CPU FALLBACK</div>
         </header>
 
-        {active === "dashboard" ? <Dashboard onNavigate={setActive} /> : active === "models" ? <ModelsView model={uploadedModel} onModelReady={setUploadedModel} /> : <Placeholder label={activeItem.label} />}
+        {active === "dashboard" ? <Dashboard onNavigate={setActive} /> : active === "models" ? <ModelsView model={uploadedModel} onModelReady={setUploadedModel} /> : active === "solve" ? <SolveConfigurationView config={solverConfiguration} onChange={setSolverConfiguration} /> : <Placeholder label={activeItem.label} />}
 
         <footer className="footer">Indigenous GPU Optimizer · React/Vite foundation · Solver logic remains authoritative in C++</footer>
       </main>
@@ -122,3 +126,12 @@ function ModelsView({ model, onModelReady }: { model: UploadedModel | null; onMo
 }
 
 function formatBytes(bytes: number) { if (bytes < 1024) return bytes + " B"; if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"; return (bytes / (1024 * 1024)).toFixed(1) + " MB"; }
+
+function SolveConfigurationView({ config, onChange }: { config: SolverConfiguration; onChange: (config: SolverConfiguration) => void }) {
+  const [saved, setSaved] = useState(false);
+  return <section className="dashboard">
+    <div className="hero"><div><span className="eyebrow">PHASE 6.4 · SOLVER CONFIGURATION</span><h2>Configure a solve</h2><p>Set solver, convergence, backend, fallback, and profiling policies before the C++ API launches a solve.</p></div><div className="hero-badge"><span className="status-dot" /> {saved ? "Configuration saved" : "Draft configuration"}</div></div>
+    <SolverConfigurationPanel value={config} onChange={(next) => { onChange(next); setSaved(true); }} onSave={() => setSaved(true)} />
+    <article className="panel activity"><div className="panel-heading"><div><span className="eyebrow">CURRENT POLICY</span><h3>Execution policy</h3></div></div><div className="action-grid"><Capability name="Backend" state={config.backendPolicy.toUpperCase()} /><Capability name="CPU fallback" state={config.enableCpuFallback ? "ENABLED" : "DISABLED"} /><Capability name="Numerical validation" state={config.enableNumericalValidation ? "ENABLED" : "DISABLED"} /><Capability name="Profiling" state={config.enableProfiling ? "ENABLED" : "DISABLED"} /></div></article>
+  </section>;
+}

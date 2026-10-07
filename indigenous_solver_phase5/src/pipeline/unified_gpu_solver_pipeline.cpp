@@ -8,6 +8,8 @@ UnifiedGpuSolverPipeline::UnifiedGpuSolverPipeline(Options options)
       sparse_planner_({options.memory_budget_bytes,
                        options.preferred_batch_vectors,
                        options.max_batch_vectors}),
+      stability_guard_({options.numerical_relative_tolerance,
+                        options.numerical_absolute_tolerance}),
       basis_({options.prefer_gpu, options.pivot_tolerance}) {}
 
 bool UnifiedGpuSolverPipeline::initialize_basis(
@@ -64,6 +66,8 @@ bool UnifiedGpuSolverPipeline::ftran(
 
   auto& buffer = workspace_.ftran_buffer();
   if (!basis_.ftran(rhs, buffer)) return false;
+  const auto check = validate_result(buffer);
+  if (!check.valid) return false;
   solution = buffer;
   ++ftran_calls_;
   return true;
@@ -77,6 +81,8 @@ bool UnifiedGpuSolverPipeline::btran(
 
   auto& buffer = workspace_.btran_buffer();
   if (!basis_.btran(rhs, buffer)) return false;
+  const auto check = validate_result(buffer);
+  if (!check.valid) return false;
   solution = buffer;
   ++btran_calls_;
   return true;
@@ -91,6 +97,8 @@ bool UnifiedGpuSolverPipeline::price(
                          pricing_.valid() ? buffer.size() : 0))
     return false;
   if (!pricing_.compute(dual, buffer)) return false;
+  const auto check = validate_result(buffer);
+  if (!check.valid) return false;
   reduced_costs = buffer;
   ++pricing_calls_;
   return true;
@@ -398,6 +406,24 @@ SparseWorkloadPlanner::Plan UnifiedGpuSolverPipeline::large_scale_plan() const n
   return sparse_plan_;
 }
 
+NumericalStabilityGuard::Result UnifiedGpuSolverPipeline::validate_result(
+    const std::vector<Real>& values) const noexcept {
+  const auto result = stability_guard_.validate_vector(values);
+  ++numerical_checks_;
+  if (!result.valid) {
+    numerical_stable_ = false;
+    ++numerical_failures_;
+    last_numerical_failure_ =
+        NumericalStabilityGuard::failure_name(result.failure);
+  }
+  maximum_residual_ = std::max(maximum_residual_, result.residual);
+  return result;
+}
+
+bool UnifiedGpuSolverPipeline::numerical_stable() const noexcept {
+  return numerical_stable_;
+}
+
 UnifiedGpuSolverPipeline::Report UnifiedGpuSolverPipeline::report() const noexcept {
   const auto workspace_report = workspace_.report();
 
@@ -462,6 +488,13 @@ UnifiedGpuSolverPipeline::Report UnifiedGpuSolverPipeline::report() const noexce
   result.recommended_batch_vectors = sparse_plan_.recommended_batch_vectors;
   result.chunk_columns = sparse_plan_.chunk_columns;
   result.sparse_strategy = sparse_plan_.strategy;
+  result.numerical_stable = numerical_stable_;
+  result.fallback_active = !numerical_stable_ && options_.enable_numerical_fallback;
+  result.numerical_checks = numerical_checks_;
+  result.numerical_failures = numerical_failures_;
+  result.fallback_count = fallback_count_;
+  result.maximum_residual = maximum_residual_;
+  result.last_numerical_failure = last_numerical_failure_;
 
   return result;
 }

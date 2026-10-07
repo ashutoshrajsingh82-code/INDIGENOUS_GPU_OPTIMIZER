@@ -1,5 +1,6 @@
 #include <chrono>
 #include <iostream>
+#include <string>
 #include <thread>
 
 #include "pipeline/async_execution_engine.hpp"

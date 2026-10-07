@@ -30,6 +30,8 @@ public:
     bool adaptive_gpu_eligible = false;
     bool basis_gpu_recommended = false;
     bool pricing_gpu_recommended = false;
+    const char* adaptive_basis_backend = "CPU";
+    const char* adaptive_pricing_backend = "CPU";
     std::size_t ftran_calls = 0;
     std::size_t btran_calls = 0;
     std::size_t pricing_calls = 0;

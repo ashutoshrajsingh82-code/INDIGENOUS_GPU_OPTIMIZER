@@ -5,6 +5,21 @@
 namespace indigenous::pipeline {
 
 NumericalStabilityGuard::Result
+NumericalStabilityGuard::validate_input(
+    const std::vector<double>& values) const noexcept {
+  Result result;
+  for (double value : values) {
+    if (!std::isfinite(value)) {
+      result.valid = false;
+      result.failure = Failure::NonFiniteInput;
+      result.residual = std::numeric_limits<double>::infinity();
+      return result;
+    }
+  }
+  return result;
+}
+
+NumericalStabilityGuard::Result
 NumericalStabilityGuard::validate_vector(
     const std::vector<double>& values) const noexcept {
   Result result;

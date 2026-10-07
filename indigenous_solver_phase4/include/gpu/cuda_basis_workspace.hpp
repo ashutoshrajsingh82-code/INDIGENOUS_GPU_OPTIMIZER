@@ -43,6 +43,19 @@ public:
   std::size_t upper_nnz() const noexcept { return upper_nnz_; }
   double last_upload_ms() const noexcept { return last_upload_ms_; }
   double last_ftran_ms() const noexcept { return last_ftran_ms_; }
+  double last_btran_ms() const noexcept { return last_btran_ms_; }
+
+  // Persistent-workspace diagnostics. These counters are host-side metadata;
+  // they do not trigger device allocation or synchronization.
+  std::size_t ftran_calls() const noexcept { return ftran_calls_; }
+  std::size_t btran_calls() const noexcept { return btran_calls_; }
+  std::size_t workspace_allocations() const noexcept {
+    return workspace_allocations_;
+  }
+  std::size_t workspace_reuses() const noexcept { return workspace_reuses_; }
+  bool workspace_persistent() const noexcept {
+    return valid_ && device_ready_ && workspace_allocations_ > 0;
+  }
 
 private:
   void* d_lower_offsets_ = nullptr;
@@ -85,6 +98,10 @@ private:
   double last_upload_ms_ = 0.0;
   double last_ftran_ms_ = 0.0;
   double last_btran_ms_ = 0.0;
+  std::size_t ftran_calls_ = 0;
+  std::size_t btran_calls_ = 0;
+  std::size_t workspace_allocations_ = 0;
+  std::size_t workspace_reuses_ = 0;
   bool valid_ = false;
   bool device_ready_ = false;
 };

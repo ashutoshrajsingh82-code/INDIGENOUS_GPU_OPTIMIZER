@@ -177,7 +177,7 @@ public:
       BatchIterationResult& result);
 
   SparseWorkloadPlanner::Plan large_scale_plan() const noexcept;
-  NumericalStabilityGuard::Result validate_result(const std::vector<Real>& values) const noexcept;
+  NumericalStabilityGuard::Result validate_result(const std::vector<Real>& values) noexcept;
   bool numerical_stable() const noexcept;
 
   Report report() const noexcept;

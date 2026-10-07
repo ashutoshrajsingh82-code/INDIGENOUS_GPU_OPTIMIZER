@@ -99,8 +99,12 @@ CudaBasisWorkspace& CudaBasisWorkspace::operator=(
   solution_vector_ = other.solution_vector_;
   lower_spsv_ = other.lower_spsv_;
   upper_spsv_ = other.upper_spsv_;
+  lower_transpose_spsv_ = other.lower_transpose_spsv_;
+  upper_transpose_spsv_ = other.upper_transpose_spsv_;
   lower_buffer_ = other.lower_buffer_;
   upper_buffer_ = other.upper_buffer_;
+  lower_transpose_buffer_ = other.lower_transpose_buffer_;
+  upper_transpose_buffer_ = other.upper_transpose_buffer_;
 
   n_ = other.n_;
   lower_nnz_ = other.lower_nnz_;
@@ -146,6 +150,10 @@ CudaBasisWorkspace& CudaBasisWorkspace::operator=(
   other.last_upload_ms_ = 0.0;
   other.last_ftran_ms_ = 0.0;
   other.last_btran_ms_ = 0.0;
+  other.ftran_calls_ = 0;
+  other.btran_calls_ = 0;
+  other.workspace_allocations_ = 0;
+  other.workspace_reuses_ = 0;
   other.valid_ = false;
   other.device_ready_ = false;
   return *this;
@@ -239,6 +247,10 @@ void CudaBasisWorkspace::release() noexcept {
   last_upload_ms_ = 0.0;
   last_ftran_ms_ = 0.0;
   last_btran_ms_ = 0.0;
+  ftran_calls_ = 0;
+  btran_calls_ = 0;
+  workspace_allocations_ = 0;
+  workspace_reuses_ = 0;
   valid_ = false;
   device_ready_ = false;
 }
@@ -495,6 +507,8 @@ bool CudaBasisWorkspace::initialize(
       std::chrono::steady_clock::now() - start).count();
   valid_ = true;
   device_ready_ = true;
+  workspace_allocations_ = 1;
+  workspace_reuses_ = 0;
   return true;
 }
 
@@ -506,6 +520,8 @@ bool CudaBasisWorkspace::ftran(const std::vector<Real>& rhs,
   }
 
   const auto start = std::chrono::steady_clock::now();
+  ++ftran_calls_;
+  if (ftran_calls_ > 1 || btran_calls_ > 0) ++workspace_reuses_;
   const auto bytes = static_cast<std::size_t>(n_) * sizeof(Real);
 
   if (!ok(cudaMemcpy(d_rhs_, rhs.data(), bytes, cudaMemcpyHostToDevice)))
@@ -562,6 +578,8 @@ bool CudaBasisWorkspace::btran(const std::vector<Real>& rhs,
   }
 
   const auto start = std::chrono::steady_clock::now();
+  ++btran_calls_;
+  if (ftran_calls_ > 0 || btran_calls_ > 1) ++workspace_reuses_;
   const auto bytes = static_cast<std::size_t>(n_) * sizeof(Real);
 
   if (!ok(cudaMemcpy(d_rhs_, rhs.data(), bytes, cudaMemcpyHostToDevice)))

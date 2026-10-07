@@ -33,7 +33,7 @@ bool UnifiedGpuSolverPipeline::initialize_pricing(
     const std::vector<Real>& objective) {
   pricing_decision_ = adaptive_selector_.select(
       AdaptiveBackendSelector::Operation::Pricing,
-      objective.empty() ? 0 : (offsets.size() - 1),
+      offsets.empty() ? 0 : (offsets.size() - 1),
       values.size());
   ++adaptive_decisions_;
   pricing_initialized_ = pricing_.initialize(offsets, rows, values, objective);

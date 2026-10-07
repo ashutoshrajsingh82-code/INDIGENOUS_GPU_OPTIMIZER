@@ -3,7 +3,7 @@ import { navigation, runtimeStatus, type SolverNavigationItem } from "./types/so
 import "./styles.css";
 
 function App() {
-  const [active, setActive] = useState<SolverSolverNavigationItem["id"]>("dashboard");
+  const [active, setActive] = useState<SolverNavigationItem["id"]>("dashboard");
   const activeItem = useMemo(
     () => navigation.find((item) => item.id === active) ?? navigation[0],
     [active],
@@ -97,7 +97,7 @@ function Capability({ name, state }: { name: string; state: string }) {
   return <div className="capability"><span className="cap-icon">✓</span><div><strong>{name}</strong><small>{state}</small></div></div>;
 }
 
-function Action({ title, text, target }: { title: string; text: string; target: SolverSolverNavigationItem["id"] }) {
+function Action({ title, text, target }: { title: string; text: string; target: SolverNavigationItem["id"] }) {
   return <button className="action-card" onClick={() => window.dispatchEvent(new CustomEvent("solver-nav", { detail: target }))}><strong>{title} <span>→</span></strong><small>{text}</small></button>;
 }
 

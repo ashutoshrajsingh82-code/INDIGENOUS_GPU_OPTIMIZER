@@ -8,6 +8,7 @@ import { LiveSolver } from "./components/LiveSolver";
 import { ResultsExplorer } from "./components/ResultsExplorer";
 import { GpuMonitor } from "./components/GpuMonitor";
 import { BenchmarkDashboard } from "./components/BenchmarkDashboard";
+import { VerificationDashboard } from "./components/VerificationDashboard";
 import { navigation, runtimeStatus, type SolverNavigationItem } from "./types/solver";
 import "./styles.css";
 

@@ -211,6 +211,11 @@ private:
   mutable std::mutex async_operation_mutex_;
   std::size_t batch_calls_ = 0;
   std::size_t batch_vectors_processed_ = 0;
+  std::vector<std::size_t> pricing_offsets_;
+  std::vector<std::size_t> pricing_rows_;
+  std::vector<Real> pricing_values_;
+  std::vector<Real> pricing_objective_;
+  bool cpu_fallback_required_ = false;
 };
 
 }  // namespace indigenous::pipeline

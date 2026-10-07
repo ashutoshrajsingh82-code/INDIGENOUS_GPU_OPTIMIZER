@@ -77,7 +77,7 @@ $sum=[pscustomobject]@{
 }
 $sum|Export-Csv $OutputSummaryCsv -NoTypeInformation
 
-$report=@("# Phase 4.11 Benchmark Report","","This benchmark runs the existing Phase 2 and Phase 3 solver CLIs on the standard Netlib model set. Phase 4 is represented by its validated basis backend status; the Phase 4 basis library is not yet a full replacement for the Phase 2 revised simplex solver.","","## Summary","","| Metric | Result |","|---|---:|")
+$report=@("# Phase 4.12 Backend and Benchmark Report","","This Phase 4.12 report combines the existing Phase 2/3 benchmark data with explicit backend capability reporting. The Phase 4 basis layer remains a validated backend facade and is not yet a full replacement for the Phase 2 revised simplex solver. This benchmark runs the existing Phase 2 and Phase 3 solver CLIs on the standard Netlib model set. Phase 4 is represented by its validated basis backend status; the Phase 4 basis library is not yet a full replacement for the Phase 2 revised simplex solver.","","## Summary","","| Metric | Result |","|---|---:|")
 $report+="| Models | $($sum.models) |"
 $report+="| Phase 2 total | $($sum.phase2_total_ms) ms |"
 $report+="| Phase 3 total | $($sum.phase3_total_ms) ms |"
@@ -91,8 +91,8 @@ $report+="## Per-model results",""
 $report+="| Model | P2 ms | P3 ms | Speedup | P3 backend | P3 certificate | Objective diff |"
 $report+="|---|---:|---:|---:|---|---|---:|"
 foreach($r in $rows){$report+="| $($r.model) | $([math]::Round($r.phase2_ms,4)) | $([math]::Round($r.phase3_ms,4)) | $([math]::Round($r.phase3_speedup,4))x | $($r.phase3_backend) | $($r.phase3_certificate) | $([math]::Round($r.objective_difference,12)) |"}
-$report+="","## Interpretation",""
-$report+="- Phase 4.10 numerical validation is a separate CUDA-capable-machine test and is not silently converted into a CPU result."
+$report+="","## Backend reporting",""
+$report+="- Phase 4.12 backend reporting separates CUDA build capability from active execution.\n- Phase 4.10 numerical validation is a separate CUDA-capable-machine test and is not silently converted into a CPU result."
 $report+="- On the current Intel-only machine, Phase 3 backend measurements are CPU fallback measurements, not GPU acceleration."
 $report+="- Phase 4 basis functionality is validated by the Phase 4 CTest suite; full revised-simplex replacement remains a later integration task."
 $report|Set-Content $OutputReport -Encoding UTF8

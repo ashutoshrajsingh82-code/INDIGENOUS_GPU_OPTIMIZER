@@ -44,7 +44,7 @@ check_language(CUDA)
 
 if(CMAKE_CUDA_COMPILER)
   enable_language(CUDA)
-  message(STATUS "Phase 4.6 backend: CUDA toolchain detected")
+  message(STATUS "Phase 4.8 backend: CUDA toolchain detected")
   find_package(CUDAToolkit REQUIRED)
 
   add_library(indigenous_phase4_cuda_basis src/gpu/cuda_basis_workspace.cu)
@@ -85,6 +85,15 @@ if(CMAKE_CUDA_COMPILER)
   )
   add_test(NAME indigenous_phase4_cuda_btran_validation
            COMMAND indigenous_phase4_cuda_btran_validation_test)
+
+  add_executable(indigenous_phase4_cuda_persistent_workspace_test
+    tests/cuda_persistent_workspace_test.cu
+  )
+  target_link_libraries(indigenous_phase4_cuda_persistent_workspace_test
+    PRIVATE indigenous_phase4_cuda_basis
+  )
+  add_test(NAME indigenous_phase4_cuda_persistent_workspace
+           COMMAND indigenous_phase4_cuda_persistent_workspace_test)
 else()
   message(STATUS "Phase 4.7 backend: CUDA toolchain unavailable; device representation target skipped")
 endif()

@@ -241,6 +241,8 @@ UnifiedGpuSolverPipeline::Report UnifiedGpuSolverPipeline::report() const noexce
       basis_decision_.use_gpu || pricing_decision_.use_gpu;
   result.basis_gpu_recommended = basis_decision_.use_gpu;
   result.pricing_gpu_recommended = pricing_decision_.use_gpu;
+  result.adaptive_basis_backend = basis_decision_.backend;
+  result.adaptive_pricing_backend = pricing_decision_.backend;
   result.adaptive_decisions = adaptive_decisions_;
   return result;
 }

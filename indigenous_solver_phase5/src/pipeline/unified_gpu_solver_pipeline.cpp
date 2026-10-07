@@ -3,10 +3,20 @@
 namespace indigenous::pipeline {
 
 UnifiedGpuSolverPipeline::UnifiedGpuSolverPipeline(Options options)
-    : options_(options), basis_({options.prefer_gpu, options.pivot_tolerance}) {}
+    : options_(options),
+      adaptive_selector_({options.prefer_gpu}),
+      basis_({options.prefer_gpu, options.pivot_tolerance}) {}
 
 bool UnifiedGpuSolverPipeline::initialize_basis(
     const SparseColumns& columns, Index dimension) {
+  basis_decision_ = adaptive_selector_.select(
+      AdaptiveBackendSelector::Operation::BasisSolve,
+      static_cast<std::size_t>(dimension), [&columns]() {
+        std::size_t nnz = 0;
+        for (const auto& column : columns) nnz += column.size();
+        return nnz;
+      }());
+  ++adaptive_decisions_;
   basis_initialized_ = basis_.initialize(columns, dimension);
   if (!basis_initialized_) return false;
   if (!workspace_.initialize(static_cast<std::size_t>(dimension))) {
@@ -21,6 +31,11 @@ bool UnifiedGpuSolverPipeline::initialize_pricing(
     const std::vector<std::size_t>& rows,
     const std::vector<Real>& values,
     const std::vector<Real>& objective) {
+  pricing_decision_ = adaptive_selector_.select(
+      AdaptiveBackendSelector::Operation::Pricing,
+      objective.empty() ? 0 : (offsets.size() - 1),
+      values.size());
+  ++adaptive_decisions_;
   pricing_initialized_ = pricing_.initialize(offsets, rows, values, objective);
   if (!pricing_initialized_) return false;
   return workspace_.ensure(UnifiedGpuWorkspace::BufferKind::Pricing,
@@ -196,6 +211,14 @@ const char* UnifiedGpuSolverPipeline::pricing_backend_name() const noexcept {
   return indigenous::gpu::backend_name();
 }
 
+const char* UnifiedGpuSolverPipeline::basis_adaptive_backend() const noexcept {
+  return basis_decision_.backend;
+}
+
+const char* UnifiedGpuSolverPipeline::pricing_adaptive_backend() const noexcept {
+  return pricing_decision_.backend;
+}
+
 UnifiedGpuSolverPipeline::Report UnifiedGpuSolverPipeline::report() const noexcept {
   const auto workspace_report = workspace_.report();
 
@@ -214,6 +237,11 @@ UnifiedGpuSolverPipeline::Report UnifiedGpuSolverPipeline::report() const noexce
   result.update_count = basis_.update_count();
   result.workspace_allocations = workspace_report.allocations;
   result.workspace_reuses = workspace_report.reuses;
+  result.adaptive_gpu_eligible =
+      basis_decision_.use_gpu || pricing_decision_.use_gpu;
+  result.basis_gpu_recommended = basis_decision_.use_gpu;
+  result.pricing_gpu_recommended = pricing_decision_.use_gpu;
+  result.adaptive_decisions = adaptive_decisions_;
   return result;
 }
 

@@ -1,136 +1,108 @@
-import { useState } from "react";
-import { navigation, runtimeStatus } from "./types/solver";
+import { useMemo, useState } from "react";
+import { navigation, runtimeStatus, type SolverNavigationItem } from "./types/solver";
+import "./styles.css";
 
 function App() {
-  const [active, setActive] = useState("dashboard");
+  const [active, setActive] = useState<SolverNavigationItem["id"]>("dashboard");
+  const activeItem = useMemo(
+    () => navigation.find((item) => item.id === active) ?? navigation[0],
+    [active],
+  );
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">IG</div>
-          <div>
-            <div className="brand-name">INDIGENOUS</div>
-            <div className="brand-subtitle">GPU OPTIMIZER</div>
-          </div>
+          <div><strong>Indigenous Solver</strong><span>GPU Optimizer</span></div>
         </div>
-
-        <div className="nav-section-title">SOLVER</div>
         <nav>
           {navigation.map((item) => (
-            <button
-              key={item.id}
-              className={active === item.id ? "nav-item active" : "nav-item"}
-              onClick={() => setActive(item.id)}
-            >
-              <span>{item.label}</span>
-              <small>{item.phase}</small>
+            <button key={item.id} className={active === item.id ? "nav-item active" : "nav-item"} onClick={() => setActive(item.id)}>
+              <span className="nav-icon">{item.icon}</span><span>{item.label}</span>
             </button>
           ))}
         </nav>
-
-        <div className="sidebar-footer">
-          <span className="status-dot" />
-          CPU fallback enabled
-        </div>
+        <div className="sidebar-footer"><span className="status-dot" /> System online</div>
       </aside>
 
-      <main className="main">
+      <main className="main-content">
         <header className="topbar">
-          <div>
-            <div className="eyebrow">PHASE 6.1 • WEB FOUNDATION</div>
-            <h1>Solver Control Center</h1>
-          </div>
-          <div className="runtime-pill">
-            <span className="status-dot" />
-            <span>{runtimeStatus.backend}</span>
-            <span className="runtime-muted">GPU unavailable</span>
-          </div>
+          <div><span className="eyebrow">PHASE 6 · WEB CONTROL CENTER</span><h1>{activeItem.label}</h1></div>
+          <div className="runtime-pill"><span className="status-dot" /> {runtimeStatus.backend} · CPU FALLBACK</div>
         </header>
 
-        <section className="hero">
-          <div>
-            <span className="tag">FOUNDATION READY</span>
-            <h2>Indigenous GPU Optimizer</h2>
-            <p>
-              A production-oriented web interface for the Phase 2–5 solver
-              pipeline. The UI keeps CPU fallback and CUDA runtime state
-              explicit.
-            </p>
-          </div>
-          <div className="hero-version">
-            <span>WEB STACK</span>
-            <strong>React + Vite + TypeScript</strong>
-          </div>
-        </section>
+        {active === "dashboard" ? <Dashboard /> : <Placeholder label={activeItem.label} />}
 
-        <section className="metrics">
-          <Metric title="Execution" value="CPU" detail="Current runtime backend" />
-          <Metric title="CUDA" value="NOT READY" detail="No NVIDIA device detected" />
-          <Metric title="Production" value="READY" detail="Phase 5 pipeline validated" />
-          <Metric title="Regression" value="22 / 22" detail="Latest Phase 5/4 test suite" />
-        </section>
-
-        <section className="content-grid">
-          <article className="panel">
-            <div className="panel-heading">
-              <div>
-                <span className="eyebrow">CURRENT MODULE</span>
-                <h3>{navigation.find((item) => item.id === active)?.label ?? "Dashboard"}</h3>
-              </div>
-              <span className="phase-badge">{navigation.find((item) => item.id === active)?.phase}</span>
-            </div>
-            <div className="placeholder">
-              <div className="placeholder-icon">◆</div>
-              <strong>Module foundation is ready</strong>
-              <p>
-                This navigation surface is intentionally a foundation in 6.1.
-                Functional solver modules will be introduced phase by phase.
-              </p>
-            </div>
-          </article>
-
-          <article className="panel">
-            <div className="panel-heading">
-              <div>
-                <span className="eyebrow">RUNTIME</span>
-                <h3>Backend status</h3>
-              </div>
-              <span className="live-badge">LIVE MODEL</span>
-            </div>
-            <StatusRow label="Execution backend" value="CPU" />
-            <StatusRow label="CUDA compiled" value="NO" />
-            <StatusRow label="CUDA device" value="NOT AVAILABLE" />
-            <StatusRow label="CPU fallback" value="ENABLED" />
-          </article>
-        </section>
-
-        <footer className="footer">
-          <span>INDIGENOUS GPU OPTIMIZER</span>
-          <span>Phase 6.1 React/Vite foundation</span>
-        </footer>
+        <footer className="footer">Indigenous GPU Optimizer · React/Vite foundation · Solver logic remains authoritative in C++</footer>
       </main>
     </div>
   );
 }
 
-function Metric({ title, value, detail }: { title: string; value: string; detail: string }) {
+function Dashboard() {
+  const cards = [
+    ["Execution", "CPU", "Active backend"],
+    ["CUDA Device", "NOT READY", "NVIDIA device unavailable"],
+    ["Production", "READY", "Pipeline preflight passed"],
+    ["Regression", "22 / 22", "Tests passing"],
+  ];
   return (
-    <article className="metric">
-      <span>{title}</span>
-      <strong>{value}</strong>
-      <small>{detail}</small>
-    </article>
+    <section className="dashboard">
+      <div className="hero">
+        <div><span className="eyebrow">SOLVER OPERATIONS</span><h2>Optimization control center</h2><p>Monitor solver readiness, configure workloads, launch solves, and inspect verification results from one workspace.</p></div>
+        <div className="hero-badge"><span className="status-dot" /> Production ready</div>
+      </div>
+
+      <div className="metric-grid">{cards.map(([label,value,detail]) => <article className="metric-card" key={label}><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>)}</div>
+
+      <div className="content-grid">
+        <article className="panel">
+          <div className="panel-heading"><div><span className="eyebrow">RUNTIME</span><h3>Backend health</h3></div><span className="badge">CPU</span></div>
+          <StatusRow label="Execution backend" value="CPU" ok />
+          <StatusRow label="CUDA compiled" value="NO" />
+          <StatusRow label="GPU runtime" value="NOT AVAILABLE" />
+          <StatusRow label="CPU fallback" value="ENABLED" ok />
+          <StatusRow label="Production pipeline" value="READY" ok />
+        </article>
+
+        <article className="panel">
+          <div className="panel-heading"><div><span className="eyebrow">CAPABILITIES</span><h3>Solver stack</h3></div></div>
+          <Capability name="Sparse pricing" state="CPU fallback" />
+          <Capability name="FTRAN / BTRAN" state="CPU backend" />
+          <Capability name="Persistent workspace" state="Enabled" />
+          <Capability name="Async execution" state="CPU-ASYNC" />
+          <Capability name="Batch operations" state="CPU-BATCH" />
+        </article>
+      </div>
+
+      <article className="panel activity">
+        <div className="panel-heading"><div><span className="eyebrow">WORKFLOW</span><h3>Next actions</h3></div></div>
+        <div className="action-grid">
+          <Action title="Upload model" text="Load an LP or MPS model for analysis." target="models" />
+          <Action title="Configure solve" text="Choose iterations, tolerances, and backend policy." target="solve" />
+          <Action title="View verification" text="Inspect regression and numerical validation." target="verification" />
+          <Action title="Explore architecture" text="Trace the Phase 2–5 solver pipeline." target="architecture" />
+        </div>
+      </article>
+    </section>
   );
 }
 
-function StatusRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="status-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
+function StatusRow({ label, value, ok = false }: { label: string; value: string; ok?: boolean }) {
+  return <div className="status-row"><span>{label}</span><strong><i className={ok ? "status-dot" : "status-dot muted"} />{value}</strong></div>;
+}
+
+function Capability({ name, state }: { name: string; state: string }) {
+  return <div className="capability"><span className="cap-icon">✓</span><div><strong>{name}</strong><small>{state}</small></div></div>;
+}
+
+function Action({ title, text, target }: { title: string; text: string; target: SolverNavigationItem["id"] }) {
+  return <button className="action-card" onClick={() => window.dispatchEvent(new CustomEvent("solver-nav", { detail: target }))}><strong>{title} <span>→</span></strong><small>{text}</small></button>;
+}
+
+function Placeholder({ label }: { label: string }) {
+  return <section className="placeholder panel"><span className="eyebrow">PHASE 6 ROADMAP</span><h2>{label}</h2><p>This module is reserved for the next Phase 6 implementation. The dashboard foundation and navigation are ready.</p></section>;
 }
 
 export default App;

@@ -75,6 +75,14 @@ int main() {
   if (!check(!report.basis_gpu_active, "basis GPU inactive on Intel")) return 1;
   if (!check(!report.pricing_gpu_active, "pricing GPU inactive on Intel")) return 1;
   if (!check(!report.gpu_active, "aggregate GPU inactive on Intel")) return 1;
+  if (!check(!report.adaptive_gpu_eligible,
+             "adaptive policy selects CPU on Intel")) return 1;
+  if (!check(!report.basis_gpu_recommended,
+             "basis adaptive recommendation is CPU")) return 1;
+  if (!check(!report.pricing_gpu_recommended,
+             "pricing adaptive recommendation is CPU")) return 1;
+  if (!check(report.adaptive_decisions == 2,
+             "two adaptive backend decisions")) return 1;
   if (!check(report.coordination_calls == 2, "two coordination calls")) return 1;
   if (!check(report.btran_calls == 2, "two BTRAN calls")) return 1;
   if (!check(report.pricing_calls == 2, "two pricing calls")) return 1;
@@ -90,6 +98,8 @@ int main() {
             << " | BTRAN: " << report.btran_calls
             << " | Pricing: " << report.pricing_calls
             << " | FTRAN: " << report.ftran_calls << "\n";
+  std::cout << "Adaptive basis: " << report.basis_adaptive_backend()
+            << " | Adaptive pricing: " << report.pricing_adaptive_backend() << "\n";
   std::cout << "Basis backend: " << report.basis_backend
             << " | Pricing backend: " << report.pricing_backend
             << " | Execution: " << (report.gpu_active ? "GPU" : "CPU") << "\n";

@@ -271,3 +271,16 @@ Outputs:
 
 ### CUDA reporting
 CUDA is reported as active only when the underlying Phase 3/4 backends actually execute on CUDA. On the current Intel-only machine, the benchmark therefore reports CPU execution and does not present CPU timings as NVIDIA GPU acceleration.
+
+
+## Phase 5.10: Performance Profiling and Bottleneck Analysis
+Phase 5.10 adds stage-level profiling to the unified pipeline without changing numerical behavior. The profiler records BTRAN, pricing, FTRAN, complete coordination, batch, and asynchronous execution times, including call counts and min/average/max timing.
+
+The benchmark reports the dominant stage and its share of measured work, together with the actual CPU/CUDA backend. This identifies whether future NVIDIA runs are limited by pricing, basis solves, orchestration, batching, or asynchronous execution.
+
+`PerformanceProfiler` is backend-neutral. On the current Intel-only machine it measures CPU execution and never labels those timings as CUDA work. The profiling output is intended to guide Phase 5.11 production integration and later CUDA optimization.
+
+Dedicated validation:
+`indigenous_phase5_performance_profiler_test.exe`
+
+The end-to-end benchmark also prints the profiler bottleneck and stage timings.

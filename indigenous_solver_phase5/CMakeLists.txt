@@ -12,6 +12,7 @@ add_library(indigenous_phase5_pipeline
   src/pipeline/async_execution_engine.cpp
   src/pipeline/sparse_workload_planner.cpp
   src/pipeline/numerical_stability_guard.cpp
+  src/pipeline/performance_profiler.cpp
 )
 target_include_directories(indigenous_phase5_pipeline PUBLIC include ../indigenous_solver_phase4/include ../indigenous_solver_phase3/include)
 target_link_libraries(indigenous_phase5_pipeline PUBLIC indigenous_phase4_basis indigenous_gpu_backend)
@@ -80,3 +81,10 @@ add_executable(indigenous_phase5_end_to_end_benchmark
   tests/end_to_end_benchmark.cpp)
 target_link_libraries(indigenous_phase5_end_to_end_benchmark PRIVATE indigenous_phase5_pipeline)
 message(STATUS "Phase 5.9 end-to-end benchmark: coordinated CPU/GPU pipeline, async and batch timing")
+
+add_executable(indigenous_phase5_performance_profiler_test
+  tests/performance_profiler_test.cpp)
+target_link_libraries(indigenous_phase5_performance_profiler_test PRIVATE indigenous_phase5_pipeline)
+add_test(NAME indigenous_phase5_performance_profiler
+  COMMAND indigenous_phase5_performance_profiler_test)
+message(STATUS "Phase 5.10 performance profiling: stage timing and bottleneck analysis")

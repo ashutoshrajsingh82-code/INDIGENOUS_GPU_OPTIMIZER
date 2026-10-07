@@ -19,3 +19,10 @@ enable_testing()
 add_test(NAME indigenous_phase5_unified_gpu_solver_pipeline COMMAND indigenous_phase5_unified_pipeline_test)
 add_test(NAME indigenous_phase5_unified_persistent_workspace COMMAND indigenous_phase5_unified_workspace_test)
 message(STATUS "Phase 5.2 persistent workspace: reusable operation buffers over Phase 3/4 backends")
+
+add_executable(indigenous_phase5_gpu_pricing_basis_coordination_test
+  tests/gpu_pricing_basis_coordination_test.cpp)
+target_link_libraries(indigenous_phase5_gpu_pricing_basis_coordination_test PRIVATE indigenous_phase5_pipeline)
+add_test(NAME indigenous_phase5_gpu_pricing_basis_coordination
+  COMMAND indigenous_phase5_gpu_pricing_basis_coordination_test)
+message(STATUS "Phase 5.3 pricing/FTRAN/BTRAN coordination: unified simplex linear-algebra sequence")

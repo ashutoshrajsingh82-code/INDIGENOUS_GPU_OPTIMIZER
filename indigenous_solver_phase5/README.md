@@ -116,3 +116,47 @@ Phase 5.5 is an execution-orchestration stage. It does not claim direct CUDA
 stream control for Phase 3/4 kernels whose existing APIs are synchronous.
 Those lower-level stream/batched operation changes belong to later GPU
 execution stages.
+
+
+## Phase 5.6: Batch / Multi-Vector GPU Operations
+Phase 5.6 adds a backend-neutral batch API for processing multiple independent
+FTRAN, BTRAN, pricing, or complete BTRAN -> pricing -> FTRAN operations
+through the same Phase 5 pipeline.
+
+### Batch API
+The pipeline exposes:
+- `batch_ftran()` for multiple FTRAN right-hand sides,
+- `batch_btran()` for multiple BTRAN right-hand sides,
+- `batch_price()` for multiple dual vectors,
+- `batch_coordinate_iteration()` for multiple complete simplex
+  linear-algebra iterations.
+
+Each batch is validated before execution so vector dimensions remain
+consistent with the initialized basis.
+
+### Workspace and backend behavior
+The batch API reuses the existing Phase 5.2 persistent workspace and the
+validated Phase 3/4 backends. On the current Intel-only machine, batch
+operations execute through the CPU backend as a logical batch. The current
+CPU implementation intentionally processes vectors sequentially through the
+persistent buffers; it does not claim SIMD or CUDA kernel batching.
+
+This establishes the stable multi-vector interface for a CUDA implementation:
+an NVIDIA/CUDA backend can replace the per-vector loop with batched
+cuSPARSE/device-kernel dispatch while preserving the public pipeline API and
+ownership model.
+
+### Reporting
+Phase 5.6 reports:
+- number of batch calls,
+- number of vectors processed,
+- batch API availability,
+- actual batch backend.
+
+On the current Intel machine the expected backend is `CPU-BATCH`. A future
+CUDA implementation should report `CUDA-BATCH` only when CUDA execution is
+actually active.
+
+The Phase 5.5 asynchronous boundary remains separate. Batch operations are
+serialized against the shared persistent workspace so they cannot race an
+in-flight asynchronous operation.

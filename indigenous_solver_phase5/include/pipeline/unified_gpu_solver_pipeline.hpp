@@ -49,6 +49,10 @@ public:
     bool async_available = true;
     bool async_gpu_capable = false;
     const char* async_backend = "CPU-ASYNC";
+    std::size_t batch_calls = 0;
+    std::size_t batch_vectors_processed = 0;
+    bool batch_available = true;
+    const char* batch_backend = "CPU-BATCH";
   };
 
   explicit UnifiedGpuSolverPipeline(Options options = {});
@@ -117,6 +121,37 @@ public:
   bool async_ready(const AsyncIteration& operation) const;
   bool wait_all_async();
 
+  using VectorBatch = std::vector<std::vector<Real>>;
+
+  // Executes multiple independent FTRAN solves as one logical batch.
+  // The CPU path reuses the persistent workspace sequentially; a CUDA
+  // backend can replace the loop with a batched kernel/SpSV dispatch.
+  bool batch_ftran(const VectorBatch& rhs_batch,
+                   VectorBatch& solution_batch);
+
+  // Executes multiple independent BTRAN solves as one logical batch.
+  bool batch_btran(const VectorBatch& rhs_batch,
+                   VectorBatch& solution_batch);
+
+  // Executes sparse reduced-cost pricing for multiple dual vectors.
+  bool batch_price(const VectorBatch& dual_batch,
+                   VectorBatch& reduced_cost_batch);
+
+  struct BatchIterationResult {
+    bool success = false;
+    VectorBatch dual;
+    VectorBatch reduced_costs;
+    VectorBatch direction;
+  };
+
+  // Executes a batch of complete BTRAN -> pricing -> FTRAN iterations.
+  // Each vector pair represents one independent simplex linear-algebra
+  // operation over the same basis/pricing state.
+  bool batch_coordinate_iteration(
+      const VectorBatch& btran_rhs_batch,
+      const VectorBatch& entering_column_batch,
+      BatchIterationResult& result);
+
   Report report() const noexcept;
 
 private:
@@ -136,6 +171,8 @@ private:
   std::size_t adaptive_decisions_ = 0;
   AsyncExecutionEngine async_engine_;
   mutable std::mutex async_operation_mutex_;
+  std::size_t batch_calls_ = 0;
+  std::size_t batch_vectors_processed_ = 0;
 };
 
 }  // namespace indigenous::pipeline

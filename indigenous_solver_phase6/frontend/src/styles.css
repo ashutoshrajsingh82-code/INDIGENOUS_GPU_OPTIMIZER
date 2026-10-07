@@ -30,3 +30,5 @@
 
 
 .muted-badge{border-color:#304154;color:#aab7c6}.monitor-notice{margin:13px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap}.monitor-notice strong{font-size:13px}.monitor-notice span{color:#8994a7;font-size:12px;flex:1}.monitor-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+.benchmark-kpi{font-variant-numeric:tabular-nums}.table-panel{padding-bottom:10px}.table-wrap td:nth-child(5){font-weight:700}.table-wrap td:nth-child(7){font-size:10px}.table-wrap td:nth-child(8){font-weight:700}

@@ -282,6 +282,7 @@ UnifiedGpuSolverPipeline::coordinate_iteration_async(
   const auto task = async_engine_.submit(
       [this, result, btran = std::move(btran_copy),
        entering = std::move(entering_copy)]() mutable {
+        ScopedPerformanceTimer timer(profiler_, PerformanceProfiler::Stage::Async);
         std::lock_guard<std::mutex> lock(async_operation_mutex_);
         result->success = coordinate_iteration(
             btran, entering, result->dual, result->reduced_costs,

@@ -97,6 +97,13 @@ int main(int argc, char** argv) {
             << " | BTRAN: " << report.btran_calls
             << " | Pricing: " << report.pricing_calls
             << " | Coordination: " << report.coordination_calls << "\n";
+  std::cout << "Profiler bottleneck: " << report.performance.bottleneck
+            << " | Bottleneck share: " << report.performance.bottleneck_percent << "%\n";
+  std::cout << "Profile BTRAN: " << report.performance.btran.total_ms
+            << " ms | Pricing: " << report.performance.pricing.total_ms
+            << " ms | FTRAN: " << report.performance.ftran.total_ms << " ms\n";
+  std::cout << "Profile Batch: " << report.performance.batch.total_ms
+            << " ms | Async: " << report.performance.async.total_ms << " ms\n";
   std::cout << "Batch calls: " << report.batch_calls
             << " | Vectors processed: " << report.batch_vectors_processed
             << " | Async submitted: " << report.async_submitted

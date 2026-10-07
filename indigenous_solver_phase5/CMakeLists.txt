@@ -50,3 +50,11 @@ target_link_libraries(indigenous_phase5_async_pipeline_test
 add_test(NAME indigenous_phase5_async_pipeline
   COMMAND indigenous_phase5_async_pipeline_test)
 message(STATUS "Phase 5.5 asynchronous execution: non-blocking pipeline task dispatch with CPU fallback")
+
+add_executable(indigenous_phase5_batch_multi_vector_pipeline_test
+  tests/batch_multi_vector_pipeline_test.cpp)
+target_link_libraries(indigenous_phase5_batch_multi_vector_pipeline_test
+  PRIVATE indigenous_phase5_pipeline)
+add_test(NAME indigenous_phase5_batch_multi_vector_pipeline
+  COMMAND indigenous_phase5_batch_multi_vector_pipeline_test)
+message(STATUS "Phase 5.6 batch/multi-vector operations: reusable batch API over Phase 3/4 backends")

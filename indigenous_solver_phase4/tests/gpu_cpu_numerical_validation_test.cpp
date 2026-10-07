@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <numeric>
 #include <vector>
 
 namespace {

@@ -45,7 +45,7 @@ function App() {
           <div className="runtime-pill"><span className="status-dot" /> {runtimeStatus.backend} · CPU FALLBACK</div>
         </header>
 
-        {active === "dashboard" ? <Dashboard onNavigate={setActive} /> : active === "models" ? <ModelsView model={uploadedModel} onModelReady={setUploadedModel} /> : active === "solve" ? <SolveConfigurationView config={solverConfiguration} onChange={setSolverConfiguration} /> : active === "live" ? <LiveSolver model={uploadedModel} config={solverConfiguration} onJobCreated={setLastJobId} /> : active === "results" ? <ResultsExplorer jobId={lastJobId} /> : active === "gpu" ? <GpuMonitor /> : active === "benchmarks" ? <BenchmarkDashboard /> : <Placeholder label={activeItem.label} />}
+        {active === "dashboard" ? <Dashboard onNavigate={setActive} /> : active === "models" ? <ModelsView model={uploadedModel} onModelReady={setUploadedModel} /> : active === "solve" ? <SolveConfigurationView config={solverConfiguration} onChange={setSolverConfiguration} /> : active === "live" ? <LiveSolver model={uploadedModel} config={solverConfiguration} onJobCreated={setLastJobId} /> : active === "results" ? <ResultsExplorer jobId={lastJobId} /> : active === "gpu" ? <GpuMonitor /> : active === "benchmarks" ? <BenchmarkDashboard /> : active === "verification" ? <VerificationDashboard /> : <Placeholder label={activeItem.label} />}
 
         <footer className="footer">Indigenous GPU Optimizer · React/Vite foundation · Solver logic remains authoritative in C++</footer>
       </main>

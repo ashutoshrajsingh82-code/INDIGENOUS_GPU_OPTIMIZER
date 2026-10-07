@@ -4,6 +4,7 @@
 #include "basis/simplex_basis_backend.hpp"
 #include "gpu/sparse_pricing.hpp"
 #include "pipeline/unified_gpu_workspace.hpp"
+#include "pipeline/adaptive_backend_selector.hpp"
 
 namespace indigenous::pipeline {
 
@@ -26,6 +27,9 @@ public:
     bool pricing_gpu_active = false;
     bool initialized = false;
     bool workspace_persistent = false;
+    bool adaptive_gpu_eligible = false;
+    bool basis_gpu_recommended = false;
+    bool pricing_gpu_recommended = false;
     std::size_t ftran_calls = 0;
     std::size_t btran_calls = 0;
     std::size_t pricing_calls = 0;
@@ -33,6 +37,7 @@ public:
     std::size_t update_count = 0;
     std::size_t workspace_allocations = 0;
     std::size_t workspace_reuses = 0;
+    std::size_t adaptive_decisions = 0;
   };
 
   explicit UnifiedGpuSolverPipeline(Options options = {});
@@ -76,10 +81,15 @@ public:
   bool workspace_persistent() const noexcept;
   const char* basis_backend_name() const noexcept;
   const char* pricing_backend_name() const noexcept;
+  const char* basis_adaptive_backend() const noexcept;
+  const char* pricing_adaptive_backend() const noexcept;
   Report report() const noexcept;
 
 private:
   Options options_;
+  AdaptiveBackendSelector adaptive_selector_;
+  AdaptiveBackendSelector::Decision basis_decision_;
+  AdaptiveBackendSelector::Decision pricing_decision_;
   basis::SimplexBasisBackend basis_;
   gpu::SparsePricingWorkspace pricing_;
   UnifiedGpuWorkspace workspace_;
@@ -89,6 +99,7 @@ private:
   std::size_t btran_calls_ = 0;
   std::size_t pricing_calls_ = 0;
   std::size_t coordination_calls_ = 0;
+  std::size_t adaptive_decisions_ = 0;
 };
 
 }  // namespace indigenous::pipeline

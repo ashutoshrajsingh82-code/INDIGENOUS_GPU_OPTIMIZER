@@ -8,6 +8,7 @@ add_subdirectory(../indigenous_solver_phase4 phase4_build)
 add_library(indigenous_phase5_pipeline
   src/pipeline/unified_gpu_solver_pipeline.cpp
   src/pipeline/unified_gpu_workspace.cpp
+  src/pipeline/adaptive_backend_selector.cpp
 )
 target_include_directories(indigenous_phase5_pipeline PUBLIC include ../indigenous_solver_phase4/include ../indigenous_solver_phase3/include)
 target_link_libraries(indigenous_phase5_pipeline PUBLIC indigenous_phase4_basis indigenous_gpu_backend)
@@ -19,3 +20,17 @@ enable_testing()
 add_test(NAME indigenous_phase5_unified_gpu_solver_pipeline COMMAND indigenous_phase5_unified_pipeline_test)
 add_test(NAME indigenous_phase5_unified_persistent_workspace COMMAND indigenous_phase5_unified_workspace_test)
 message(STATUS "Phase 5.2 persistent workspace: reusable operation buffers over Phase 3/4 backends")
+
+add_executable(indigenous_phase5_gpu_pricing_basis_coordination_test
+  tests/gpu_pricing_basis_coordination_test.cpp)
+target_link_libraries(indigenous_phase5_gpu_pricing_basis_coordination_test PRIVATE indigenous_phase5_pipeline)
+add_test(NAME indigenous_phase5_gpu_pricing_basis_coordination
+  COMMAND indigenous_phase5_gpu_pricing_basis_coordination_test)
+message(STATUS "Phase 5.3 pricing/FTRAN/BTRAN coordination: unified simplex linear-algebra sequence")
+
+add_executable(indigenous_phase5_adaptive_backend_selector_test
+  tests/adaptive_backend_selector_test.cpp)
+target_link_libraries(indigenous_phase5_adaptive_backend_selector_test PRIVATE indigenous_phase5_pipeline)
+add_test(NAME indigenous_phase5_adaptive_backend_selector
+  COMMAND indigenous_phase5_adaptive_backend_selector_test)
+message(STATUS "Phase 5.4 adaptive backend selection: workload-aware CPU/GPU policy")

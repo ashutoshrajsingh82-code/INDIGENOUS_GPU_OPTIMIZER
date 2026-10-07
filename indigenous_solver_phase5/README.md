@@ -19,3 +19,66 @@ A buffer is allocated or grown when its capacity is insufficient. Subsequent req
 On the current Intel-only machine these are persistent host buffers. Actual CUDA device-memory execution remains pending an NVIDIA/CUDA machine.
 
 Phase 5.2 still does not modify the Phase 2 RevisedSimplex iteration loop or introduce asynchronous execution; those belong to later Phase 5 stages.
+
+
+## Phase 5.3: GPU Pricing + FTRAN/BTRAN Coordination
+Phase 5.3 coordinates the three linear-algebra operations used by a revised-simplex iteration without duplicating ownership of Phase 3 or Phase 4 state.
+
+### Coordinated sequence
+- **BTRAN:** solve (B^T y = b) using the Phase 4 basis backend.
+- **Pricing:** compute (r = c - A^T y) using the Phase 3 sparse-pricing workspace.
+- **FTRAN:** solve (B d = a_{enter}) using the Phase 4 basis backend.
+
+The pipeline exposes:
+- `btran_and_price()` for dual construction followed by reduced-cost pricing.
+- `price_and_ftran()` for reduced-cost pricing followed by entering-column FTRAN.
+- `coordinate_iteration()` for the complete BTRAN -> pricing -> FTRAN sequence.
+
+The same Phase 5.2 persistent operation workspace is reused across these calls. Phase 4.8 remains the owner of CUDA-resident basis state, and Phase 3 remains the owner of CUDA-resident immutable CSC pricing state.
+
+### Mixed CPU/GPU reporting
+Phase 5.3 separates:
+- basis GPU activity,
+- pricing GPU activity,
+- aggregate GPU activity.
+
+This avoids incorrectly reporting the entire pipeline as CPU when pricing is on CUDA but the basis backend is still CPU.
+
+Phase 5.3 still does not replace the Phase 2 RevisedSimplex iteration loop. It provides the backend-neutral coordinated linear-algebra path that a later production integration stage can call.
+
+## Phase 5.4: Adaptive CPU/GPU Workload Selection
+Phase 5.4 adds an explicit workload-aware backend policy above the Phase 5.1-5.3 orchestration layer.
+
+### Selection policy
+The adaptive selector considers:
+- whether a CUDA-capable device is actually available at runtime,
+- whether GPU preference is enabled,
+- problem dimension,
+- sparse nonzero count,
+- an estimated operation workload.
+
+Small or sparse workloads stay on CPU to avoid GPU launch, transfer, and synchronization overhead. Larger workloads are eligible for GPU execution when CUDA is genuinely available.
+
+Default thresholds are:
+- minimum dimension: 256,
+- minimum nonzeros: 4096,
+- minimum estimated work: 1,000,000.
+
+The thresholds are policy values, not correctness requirements. They can be changed through AdaptiveBackendSelector::Options.
+
+### Reporting
+The pipeline now reports both:
+- the backend that is actually executing, and
+- the adaptive backend recommendation.
+
+This distinction is intentional. Phase 5.4 does not falsely claim GPU execution on a machine without an NVIDIA/CUDA device.
+
+On the current Intel-only machine:
+- CUDA availability is false,
+- basis adaptive recommendation is CPU,
+- pricing adaptive recommendation is CPU,
+- aggregate adaptive GPU eligibility is false.
+
+On an NVIDIA/CUDA machine, large workloads can be recommended for GPU while small workloads remain on CPU.
+
+Phase 5.4 remains a backend-selection policy layer; later phases can use these decisions for asynchronous execution, batching, and production routing.

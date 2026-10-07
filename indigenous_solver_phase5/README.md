@@ -241,3 +241,33 @@ Phase 5.8 exposes:
 The current Intel-only machine continues to execute CPU paths, so CUDA
 fallback recovery cannot be runtime-demonstrated locally. The safety path is
 implemented and CPU validation covers finite-value rejection and accounting.
+
+
+## Phase 5.9: End-to-End GPU/CPU Benchmarking
+Phase 5.9 adds a reproducible benchmark layer across the existing solver stack and the unified Phase 5 pipeline.
+
+### Model-level benchmark
+`tools/benchmark_phase5.ps1` runs the existing Phase 2 and Phase 3 CLI solvers on the ten Netlib benchmark models: afiro, adlittle, blend, bore3d, brandy, grow15, kb2, lotfi, sc50b, share1b.
+
+It records total solve time, iteration count, objective difference, certificate status, Phase 3 backend, aggregate speedup, and model-level wins.
+
+### Unified Phase 5 benchmark
+`indigenous_phase5_end_to_end_benchmark.exe` exercises repeated BTRAN -> pricing -> FTRAN coordination, multi-vector batch coordination, asynchronous coordination, persistent workspace, and numerical-stability reporting.
+
+Usage: `indigenous_phase5_end_to_end_benchmark.exe [dimension] [iterations] [batch_size]`
+
+Defaults are 64 dimensions, 100 coordinated iterations, and batch size 8. The benchmark reports actual basis/pricing backends, async/batch backends, workspace persistence, operation counters, and numerical stability.
+
+### Reproducible command
+From the repository root after building Phase 5:
+
+`powershell -ExecutionPolicy Bypass -File indigenous_solver_phase5/tools/benchmark_phase5.ps1`
+
+Outputs:
+- `benchmarks/netlib/phase5_end_to_end_comparison.csv`
+- `benchmarks/netlib/phase5_end_to_end_summary.csv`
+- `benchmarks/netlib/phase5_end_to_end_report.md`
+- `benchmarks/netlib/phase5_pipeline_benchmark_output.txt`
+
+### CUDA reporting
+CUDA is reported as active only when the underlying Phase 3/4 backends actually execute on CUDA. On the current Intel-only machine, the benchmark therefore reports CPU execution and does not present CPU timings as NVIDIA GPU acceleration.

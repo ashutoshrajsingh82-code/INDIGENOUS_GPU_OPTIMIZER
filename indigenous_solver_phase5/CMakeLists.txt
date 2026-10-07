@@ -40,8 +40,7 @@ message(STATUS "Phase 5.4 adaptive backend selection: workload-aware CPU/GPU pol
 
 add_executable(indigenous_phase5_async_execution_engine_test
   tests/async_execution_engine_test.cpp)
-target_link_libraries(indigenous_phase5_async_execution_engine_test
-  PRIVATE indigenous_phase5_pipeline)
+target_link_libraries(indigenous_phase5_async_execution_engine_test PRIVATE indigenous_phase5_pipeline)
 add_test(NAME indigenous_phase5_async_execution_engine
   COMMAND indigenous_phase5_async_execution_engine_test)
 
@@ -76,3 +75,8 @@ target_link_libraries(indigenous_phase5_numerical_stability_test
 add_test(NAME indigenous_phase5_numerical_stability
   COMMAND indigenous_phase5_numerical_stability_test)
 message(STATUS "Phase 5.8 numerical stability: finite-value guards, recovery and safe fallback")
+
+add_executable(indigenous_phase5_end_to_end_benchmark
+  tests/end_to_end_benchmark.cpp)
+target_link_libraries(indigenous_phase5_end_to_end_benchmark PRIVATE indigenous_phase5_pipeline)
+message(STATUS "Phase 5.9 end-to-end benchmark: coordinated CPU/GPU pipeline, async and batch timing")

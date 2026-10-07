@@ -12,6 +12,7 @@ export interface SolverNavigationItem {
   id: string;
   label: string;
   phase: string;
+  icon: string;
 }
 
 export const runtimeStatus: RuntimeStatus = {
@@ -23,13 +24,13 @@ export const runtimeStatus: RuntimeStatus = {
 };
 
 export const navigation: SolverNavigationItem[] = [
-  { id: "dashboard", label: "Dashboard", phase: "6.2" },
-  { id: "models", label: "Models", phase: "6.3" },
-  { id: "solve", label: "Solve", phase: "6.4" },
-  { id: "results", label: "Results", phase: "6.7" },
-  { id: "gpu", label: "GPU Monitor", phase: "6.8" },
-  { id: "benchmarks", label: "Benchmarks", phase: "6.9" },
-  { id: "verification", label: "Verification", phase: "6.10" },
-  { id: "architecture", label: "Architecture", phase: "6.11" },
-  { id: "reports", label: "Reports", phase: "6.12" },
+  { id: "dashboard", label: "Dashboard", phase: "6.2", icon: "⌂" },
+  { id: "models", label: "Models", phase: "6.3", icon: "▣" },
+  { id: "solve", label: "Solve", phase: "6.4", icon: "▶" },
+  { id: "results", label: "Results", phase: "6.7", icon: "◈" },
+  { id: "gpu", label: "GPU Monitor", phase: "6.8", icon: "▥" },
+  { id: "benchmarks", label: "Benchmarks", phase: "6.9", icon: "↗" },
+  { id: "verification", label: "Verification", phase: "6.10", icon: "✓" },
+  { id: "architecture", label: "Architecture", phase: "6.11", icon: "◇" },
+  { id: "reports", label: "Reports", phase: "6.12", icon: "▤" },
 ];

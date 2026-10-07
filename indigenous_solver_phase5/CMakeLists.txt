@@ -13,9 +13,10 @@ add_library(indigenous_phase5_pipeline
   src/pipeline/sparse_workload_planner.cpp
   src/pipeline/numerical_stability_guard.cpp
   src/pipeline/performance_profiler.cpp
+  src/pipeline/production_solver.cpp
 )
 target_include_directories(indigenous_phase5_pipeline PUBLIC include ../indigenous_solver_phase4/include ../indigenous_solver_phase3/include)
-target_link_libraries(indigenous_phase5_pipeline PUBLIC indigenous_phase4_basis indigenous_gpu_backend)
+target_link_libraries(indigenous_phase5_pipeline PUBLIC indigenous_phase4_basis indigenous_gpu_backend solver_phase3)
 add_executable(indigenous_phase5_unified_pipeline_test tests/unified_gpu_solver_pipeline_test.cpp)
 target_link_libraries(indigenous_phase5_unified_pipeline_test PRIVATE indigenous_phase5_pipeline)
 add_executable(indigenous_phase5_unified_workspace_test tests/unified_gpu_workspace_test.cpp)
@@ -88,3 +89,16 @@ target_link_libraries(indigenous_phase5_performance_profiler_test PRIVATE indige
 add_test(NAME indigenous_phase5_performance_profiler
   COMMAND indigenous_phase5_performance_profiler_test)
 message(STATUS "Phase 5.10 performance profiling: stage timing and bottleneck analysis")
+
+
+add_executable(indigenous_phase5_production_solver_integration_test
+  tests/production_solver_integration_test.cpp)
+target_link_libraries(indigenous_phase5_production_solver_integration_test
+  PRIVATE indigenous_phase5_pipeline)
+add_test(NAME indigenous_phase5_production_solver_integration
+  COMMAND indigenous_phase5_production_solver_integration_test)
+message(STATUS "Phase 5.11 production integration: Phase 2/3 solver facade with Phase 5 pipeline preflight")
+
+add_executable(indigenous_phase5_production_cli
+  tools/production_solver_cli.cpp)
+target_link_libraries(indigenous_phase5_production_cli PRIVATE indigenous_phase5_pipeline)

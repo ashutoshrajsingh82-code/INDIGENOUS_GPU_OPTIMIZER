@@ -133,14 +133,19 @@ CudaBasisWorkspace& CudaBasisWorkspace::operator=(
   other.solution_vector_ = nullptr;
   other.lower_spsv_ = nullptr;
   other.upper_spsv_ = nullptr;
+  other.lower_transpose_spsv_ = nullptr;
+  other.upper_transpose_spsv_ = nullptr;
   other.lower_buffer_ = nullptr;
   other.upper_buffer_ = nullptr;
+  other.lower_transpose_buffer_ = nullptr;
+  other.upper_transpose_buffer_ = nullptr;
 
   other.n_ = 0;
   other.lower_nnz_ = 0;
   other.upper_nnz_ = 0;
   other.last_upload_ms_ = 0.0;
   other.last_ftran_ms_ = 0.0;
+  other.last_btran_ms_ = 0.0;
   other.valid_ = false;
   other.device_ready_ = false;
   return *this;
@@ -171,6 +176,18 @@ void CudaBasisWorkspace::release() noexcept {
     delete descriptor;
     lower_matrix_ = nullptr;
   }
+  if (auto* descriptor = as<cusparseSpSVDescr_t>(lower_transpose_spsv_);
+      descriptor != nullptr) {
+    cusparseSpSV_destroyDescr(*descriptor);
+    delete descriptor;
+    lower_transpose_spsv_ = nullptr;
+  }
+  if (auto* descriptor = as<cusparseSpSVDescr_t>(upper_transpose_spsv_);
+      descriptor != nullptr) {
+    cusparseSpSV_destroyDescr(*descriptor);
+    delete descriptor;
+    upper_transpose_spsv_ = nullptr;
+  }
   if (auto* descriptor = as<cusparseSpMatDescr_t>(upper_matrix_);
       descriptor != nullptr) {
     cusparseDestroySpMat(*descriptor);
@@ -189,6 +206,9 @@ void CudaBasisWorkspace::release() noexcept {
     delete descriptor;
     upper_spsv_ = nullptr;
   }
+  free_device(as<void>(lower_transpose_buffer_));
+  free_device(as<void>(upper_transpose_buffer_));
+
   if (auto* handle = as<cusparseHandle_t>(cusparse_handle_);
       handle != nullptr) {
     cusparseDestroy(*handle);
@@ -218,6 +238,7 @@ void CudaBasisWorkspace::release() noexcept {
   upper_nnz_ = 0;
   last_upload_ms_ = 0.0;
   last_ftran_ms_ = 0.0;
+  last_btran_ms_ = 0.0;
   valid_ = false;
   device_ready_ = false;
 }
@@ -373,19 +394,29 @@ bool CudaBasisWorkspace::initialize(
 
   auto* lower_spsv = new cusparseSpSVDescr_t{};
   auto* upper_spsv = new cusparseSpSVDescr_t{};
+  auto* lower_transpose_spsv = new cusparseSpSVDescr_t{};
+  auto* upper_transpose_spsv = new cusparseSpSVDescr_t{};
   if (!ok(cusparseSpSV_createDescr(lower_spsv)) ||
-      !ok(cusparseSpSV_createDescr(upper_spsv))) {
+      !ok(cusparseSpSV_createDescr(upper_spsv)) ||
+      !ok(cusparseSpSV_createDescr(lower_transpose_spsv)) ||
+      !ok(cusparseSpSV_createDescr(upper_transpose_spsv))) {
     delete lower_spsv;
     delete upper_spsv;
+    delete lower_transpose_spsv;
+    delete upper_transpose_spsv;
     release();
     return false;
   }
   lower_spsv_ = lower_spsv;
   upper_spsv_ = upper_spsv;
+  lower_transpose_spsv_ = lower_transpose_spsv;
+  upper_transpose_spsv_ = upper_transpose_spsv;
 
   const Real alpha = 1.0;
   std::size_t lower_buffer_size = 0;
   std::size_t upper_buffer_size = 0;
+  std::size_t lower_transpose_buffer_size = 0;
+  std::size_t upper_transpose_buffer_size = 0;
 
   if (!ok(cusparseSpSV_bufferSize(
           *handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, *lower_matrix,
@@ -394,7 +425,17 @@ bool CudaBasisWorkspace::initialize(
       !ok(cusparseSpSV_bufferSize(
           *handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, *upper_matrix,
           *solution_vector, *forward_vector, CUDA_R_64F,
-          CUSPARSE_SPSV_ALG_DEFAULT, *upper_spsv, &upper_buffer_size))) {
+          CUSPARSE_SPSV_ALG_DEFAULT, *upper_spsv, &upper_buffer_size)) ||
+      !ok(cusparseSpSV_bufferSize(
+          *handle, CUSPARSE_OPERATION_TRANSPOSE, &alpha, *upper_matrix,
+          *rhs_vector, *solution_vector, CUDA_R_64F,
+          CUSPARSE_SPSV_ALG_DEFAULT, *upper_transpose_spsv,
+          &upper_transpose_buffer_size)) ||
+      !ok(cusparseSpSV_bufferSize(
+          *handle, CUSPARSE_OPERATION_TRANSPOSE, &alpha, *lower_matrix,
+          *solution_vector, *forward_vector, CUDA_R_64F,
+          CUSPARSE_SPSV_ALG_DEFAULT, *lower_transpose_spsv,
+          &lower_transpose_buffer_size))) {
     release();
     return false;
   }
@@ -409,6 +450,16 @@ bool CudaBasisWorkspace::initialize(
     release();
     return false;
   }
+  if (lower_transpose_buffer_size != 0 &&
+      !ok(cudaMalloc(&lower_transpose_buffer_, lower_transpose_buffer_size))) {
+    release();
+    return false;
+  }
+  if (upper_transpose_buffer_size != 0 &&
+      !ok(cudaMalloc(&upper_transpose_buffer_, upper_transpose_buffer_size))) {
+    release();
+    return false;
+  }
 
   if (!ok(cusparseSpSV_analysis(
           *handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, *lower_matrix,
@@ -417,7 +468,17 @@ bool CudaBasisWorkspace::initialize(
       !ok(cusparseSpSV_analysis(
           *handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, *upper_matrix,
           *solution_vector, *forward_vector, CUDA_R_64F,
-          CUSPARSE_SPSV_ALG_DEFAULT, *upper_spsv, upper_buffer_))) {
+          CUSPARSE_SPSV_ALG_DEFAULT, *upper_spsv, upper_buffer_)) ||
+      !ok(cusparseSpSV_analysis(
+          *handle, CUSPARSE_OPERATION_TRANSPOSE, &alpha, *upper_matrix,
+          *rhs_vector, *solution_vector, CUDA_R_64F,
+          CUSPARSE_SPSV_ALG_DEFAULT, *upper_transpose_spsv,
+          upper_transpose_buffer_)) ||
+      !ok(cusparseSpSV_analysis(
+          *handle, CUSPARSE_OPERATION_TRANSPOSE, &alpha, *lower_matrix,
+          *solution_vector, *forward_vector, CUDA_R_64F,
+          CUSPARSE_SPSV_ALG_DEFAULT, *lower_transpose_spsv,
+          lower_transpose_buffer_))) {
     release();
     return false;
   }
@@ -489,6 +550,68 @@ bool CudaBasisWorkspace::ftran(const std::vector<Real>& rhs,
   }
 
   last_ftran_ms_ = std::chrono::duration<double, std::milli>(
+      std::chrono::steady_clock::now() - start).count();
+  return true;
+}
+
+bool CudaBasisWorkspace::btran(const std::vector<Real>& rhs,
+                               std::vector<Real>& solution) {
+  if (!valid_ || !device_ready_ ||
+      static_cast<Index>(rhs.size()) != n_) {
+    return false;
+  }
+
+  const auto start = std::chrono::steady_clock::now();
+  const auto bytes = static_cast<std::size_t>(n_) * sizeof(Real);
+
+  if (!ok(cudaMemcpy(d_rhs_, rhs.data(), bytes, cudaMemcpyHostToDevice)))
+    return false;
+
+  auto* handle = as<cusparseHandle_t>(cusparse_handle_);
+  auto* upper_matrix = as<cusparseSpMatDescr_t>(upper_matrix_);
+  auto* lower_matrix = as<cusparseSpMatDescr_t>(lower_matrix_);
+  auto* rhs_vector = as<cusparseDnVecDescr_t>(rhs_vector_);
+  auto* solution_vector = as<cusparseDnVecDescr_t>(solution_vector_);
+  auto* forward_vector = as<cusparseDnVecDescr_t>(forward_vector_);
+  auto* upper_transpose_spsv =
+      as<cusparseSpSVDescr_t>(upper_transpose_spsv_);
+  auto* lower_transpose_spsv =
+      as<cusparseSpSVDescr_t>(lower_transpose_spsv_);
+
+  const Real alpha = 1.0;
+
+  // U^T*y = rhs.
+  if (!ok(cusparseSpSV_solve(
+          *handle, CUSPARSE_OPERATION_TRANSPOSE, &alpha, *upper_matrix,
+          *rhs_vector, *solution_vector, CUDA_R_64F,
+          CUSPARSE_SPSV_ALG_DEFAULT, *upper_transpose_spsv))) {
+    return false;
+  }
+
+  // L^T*z = y. L has an implicit unit diagonal.
+  if (!ok(cusparseSpSV_solve(
+          *handle, CUSPARSE_OPERATION_TRANSPOSE, &alpha, *lower_matrix,
+          *solution_vector, *forward_vector, CUDA_R_64F,
+          CUSPARSE_SPSV_ALG_DEFAULT, *lower_transpose_spsv))) {
+    return false;
+  }
+
+  // P*x = z => x[P(i)] = z[i].
+  const int threads = 256;
+  const int blocks = static_cast<int>((n_ + threads - 1) / threads);
+  permute_rhs_kernel<<<blocks, threads>>>(
+      as<const Real>(d_forward_), as<const std::int64_t>(d_permutation_),
+      as<Real>(d_solution_), n_);
+  if (!ok(cudaGetLastError())) return false;
+
+  solution.resize(static_cast<std::size_t>(n_));
+  if (!ok(cudaMemcpy(solution.data(), d_solution_, bytes,
+                     cudaMemcpyDeviceToHost))) {
+    solution.clear();
+    return false;
+  }
+
+  last_btran_ms_ = std::chrono::duration<double, std::milli>(
       std::chrono::steady_clock::now() - start).count();
   return true;
 }

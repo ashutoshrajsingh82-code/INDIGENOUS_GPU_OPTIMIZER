@@ -82,3 +82,37 @@ On the current Intel-only machine:
 On an NVIDIA/CUDA machine, large workloads can be recommended for GPU while small workloads remain on CPU.
 
 Phase 5.4 remains a backend-selection policy layer; later phases can use these decisions for asynchronous execution, batching, and production routing.
+
+
+## Phase 5.5: Asynchronous GPU / Pipeline Execution
+Phase 5.5 adds a backend-neutral asynchronous execution boundary around the
+unified solver pipeline.
+
+### Execution model
+- AsyncExecutionEngine submits operations with an explicit asynchronous
+  std::launch::async policy and tracks submitted, completed, and in-flight
+  tasks.
+- UnifiedGpuSolverPipeline::coordinate_iteration_async() dispatches the
+  complete BTRAN -> pricing -> FTRAN sequence without blocking the caller.
+- The async pipeline serializes access to the shared Phase 5.2 persistent
+  operation workspace, preventing concurrent tasks from racing reusable
+  buffers.
+- Results are returned through shared asynchronous result state and are
+  validated after wait_async().
+
+### Backend reporting
+Asynchronous dispatch is reported separately from GPU activity:
+- CPU-ASYNC means the asynchronous task boundary is active while the
+  underlying pipeline is using the CPU backend.
+- GPU execution is reported as active only when the Phase 3/4 CUDA backends
+  actually report GPU activity.
+- async_gpu_capable therefore remains false on the current Intel-only
+  machine.
+
+This distinction prevents asynchronous CPU execution from being incorrectly
+reported as CUDA execution.
+
+Phase 5.5 is an execution-orchestration stage. It does not claim direct CUDA
+stream control for Phase 3/4 kernels whose existing APIs are synchronous.
+Those lower-level stream/batched operation changes belong to later GPU
+execution stages.

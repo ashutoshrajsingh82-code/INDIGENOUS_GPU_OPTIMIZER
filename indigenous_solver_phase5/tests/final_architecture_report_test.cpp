@@ -23,7 +23,7 @@ int main() {
       indigenous::pipeline::FinalArchitectureReport::build(
           production.pipeline_report(), production.report());
 
-  if (!result.primal.size() == 2) {
+  if (result.primal.size() != 2) {
     std::cerr << "FAIL: primal result\n";
     return 1;
   }
@@ -35,8 +35,8 @@ int main() {
       snapshot.gpu_active ||
       snapshot.basis_gpu_active ||
       snapshot.pricing_gpu_active ||
-      snapshot.pipeline_preflight_passed != true ||
-      snapshot.numerical_stable != true) {
+      !snapshot.pipeline_preflight_passed ||
+      !snapshot.numerical_stable) {
     std::cerr << "FAIL: CPU architecture snapshot\n";
     return 1;
   }

@@ -23,14 +23,18 @@ bool UnifiedGpuWorkspace::ensure(BufferKind kind, std::size_t element_count) {
   if (!initialized_) return false;
 
   auto& target = buffer(kind);
-  if (target.capacity() >= element_count) {
-    target.resize(element_count);
+
+  // Capacity, not current size, determines whether storage is reusable.
+  // reserve() makes the growth event explicit and keeps the allocation
+  // accounting independent of implementation-specific resize growth policy.
+  if (target.capacity() < element_count) {
+    target.reserve(element_count);
+    ++allocations_;
+  } else {
     ++reuses_;
-    return true;
   }
 
   target.resize(element_count);
-  ++allocations_;
   return true;
 }
 
@@ -47,10 +51,14 @@ UnifiedGpuWorkspace::Report UnifiedGpuWorkspace::report() const noexcept {
 }
 
 void UnifiedGpuWorkspace::release() noexcept {
-  std::vector<double>().swap(ftran_);
-  std::vector<double>().swap(btran_);
-  std::vector<double>().swap(pricing_);
-  std::vector<double>().swap(pivot_);
+  ftran_.clear();
+  btran_.clear();
+  pricing_.clear();
+  pivot_.clear();
+  ftran_.shrink_to_fit();
+  btran_.shrink_to_fit();
+  pricing_.shrink_to_fit();
+  pivot_.shrink_to_fit();
   dimension_ = 0;
   allocations_ = 0;
   reuses_ = 0;

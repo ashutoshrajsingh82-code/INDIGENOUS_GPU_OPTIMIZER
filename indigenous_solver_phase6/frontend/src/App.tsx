@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { navigationItems, runtimeStatus, type NavigationItem } from "./types/solver";
+import { navigation, runtimeStatus, type SolverNavigationItem } from "./types/solver";
 import "./styles.css";
 
 function App() {
-  const [active, setActive] = useState<NavigationItem["id"]>("dashboard");
+  const [active, setActive] = useState<SolverSolverNavigationItem["id"]>("dashboard");
   const activeItem = useMemo(
-    () => navigationItems.find((item) => item.id === active) ?? navigationItems[0],
+    () => navigation.find((item) => item.id === active) ?? navigation[0],
     [active],
   );
 
@@ -17,7 +17,7 @@ function App() {
           <div><strong>Indigenous Solver</strong><span>GPU Optimizer</span></div>
         </div>
         <nav>
-          {navigationItems.map((item) => (
+          {navigation.map((item) => (
             <button key={item.id} className={active === item.id ? "nav-item active" : "nav-item"} onClick={() => setActive(item.id)}>
               <span className="nav-icon">{item.icon}</span><span>{item.label}</span>
             </button>
@@ -97,7 +97,7 @@ function Capability({ name, state }: { name: string; state: string }) {
   return <div className="capability"><span className="cap-icon">✓</span><div><strong>{name}</strong><small>{state}</small></div></div>;
 }
 
-function Action({ title, text, target }: { title: string; text: string; target: NavigationItem["id"] }) {
+function Action({ title, text, target }: { title: string; text: string; target: SolverSolverNavigationItem["id"] }) {
   return <button className="action-card" onClick={() => window.dispatchEvent(new CustomEvent("solver-nav", { detail: target }))}><strong>{title} <span>→</span></strong><small>{text}</small></button>;
 }
 

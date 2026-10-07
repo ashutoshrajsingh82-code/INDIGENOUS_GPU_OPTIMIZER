@@ -4,7 +4,7 @@
 int main() {
   solver::LinearModel model;
   model.name = "phase5_production_smoke";
-  model.minimize = false;
+  model.minimize = true;
   model.variables.resize(2);
   model.variables[0].name = "x";
   model.variables[1].name = "y";
@@ -30,7 +30,13 @@ int main() {
       !report.optimal ||
       !report.pipeline_preflight ||
       !report.pipeline_preflight_passed) {
-    std::cerr << "FAIL: production integration report\n";
+    std::cerr << "FAIL: production integration report\n"
+              << " solved=" << report.solved
+              << " optimal=" << report.optimal
+              << " status=" << solver::to_string(result.status)
+              << " pipeline_preflight=" << report.pipeline_preflight
+              << " pipeline_preflight_passed=" << report.pipeline_preflight_passed
+              << " message=" << report.message << "\n";
     return 1;
   }
 

@@ -5,6 +5,9 @@ namespace indigenous::pipeline {
 UnifiedGpuSolverPipeline::UnifiedGpuSolverPipeline(Options options)
     : options_(options),
       adaptive_selector_({options.prefer_gpu}),
+      sparse_planner_({options.memory_budget_bytes,
+                       options.preferred_batch_vectors,
+                       options.max_batch_vectors}),
       basis_({options.prefer_gpu, options.pivot_tolerance}) {}
 
 bool UnifiedGpuSolverPipeline::initialize_basis(
@@ -17,6 +20,12 @@ bool UnifiedGpuSolverPipeline::initialize_basis(
         return nnz;
       }());
   ++adaptive_decisions_;
+  sparse_stats_.rows = static_cast<std::size_t>(dimension);
+  sparse_stats_.columns = columns.size();
+  sparse_stats_.nonzeros = 0;
+  for (const auto& column : columns)
+    sparse_stats_.nonzeros += column.size();
+  sparse_plan_ = sparse_planner_.plan(sparse_stats_);
   basis_initialized_ = basis_.initialize(columns, dimension);
   if (!basis_initialized_) return false;
   if (!workspace_.initialize(static_cast<std::size_t>(dimension))) {
@@ -36,6 +45,11 @@ bool UnifiedGpuSolverPipeline::initialize_pricing(
       offsets.empty() ? 0 : (offsets.size() - 1),
       values.size());
   ++adaptive_decisions_;
+  sparse_stats_.rows = offsets.empty() ? sparse_stats_.rows
+                                       : sparse_stats_.rows;
+  sparse_stats_.columns = offsets.empty() ? 0 : offsets.size() - 1;
+  sparse_stats_.nonzeros = values.size();
+  sparse_plan_ = sparse_planner_.plan(sparse_stats_);
   pricing_initialized_ = pricing_.initialize(offsets, rows, values, objective);
   if (!pricing_initialized_) return false;
   return workspace_.ensure(UnifiedGpuWorkspace::BufferKind::Pricing,
@@ -380,6 +394,10 @@ const char* UnifiedGpuSolverPipeline::pricing_adaptive_backend() const noexcept 
   return pricing_decision_.backend;
 }
 
+SparseWorkloadPlanner::Plan UnifiedGpuSolverPipeline::large_scale_plan() const noexcept {
+  return sparse_plan_;
+}
+
 UnifiedGpuSolverPipeline::Report UnifiedGpuSolverPipeline::report() const noexcept {
   const auto workspace_report = workspace_.report();
 
@@ -422,6 +440,28 @@ UnifiedGpuSolverPipeline::Report UnifiedGpuSolverPipeline::report() const noexce
   // Batch dispatch is backend-neutral. CPU-BATCH means the logical batch API
   // is active while the underlying operations execute through CPU fallbacks.
   result.batch_backend = gpu_active() ? "CUDA-BATCH" : "CPU-BATCH";
+  result.sparse_rows = sparse_stats_.rows;
+  result.sparse_columns = sparse_stats_.columns;
+  result.sparse_nonzeros = sparse_stats_.nonzeros;
+  switch (sparse_plan_.scale) {
+    case SparseWorkloadPlanner::Scale::VeryLarge:
+      result.sparse_scale = "VERY_LARGE";
+      break;
+    case SparseWorkloadPlanner::Scale::Large:
+      result.sparse_scale = "LARGE";
+      break;
+    case SparseWorkloadPlanner::Scale::Medium:
+      result.sparse_scale = "MEDIUM";
+      break;
+    default:
+      result.sparse_scale = "SMALL";
+      break;
+  }
+  result.sparse_large_scale = sparse_plan_.large_scale;
+  result.estimated_csc_bytes = sparse_plan_.estimated_csc_bytes;
+  result.recommended_batch_vectors = sparse_plan_.recommended_batch_vectors;
+  result.chunk_columns = sparse_plan_.chunk_columns;
+  result.sparse_strategy = sparse_plan_.strategy;
 
   return result;
 }

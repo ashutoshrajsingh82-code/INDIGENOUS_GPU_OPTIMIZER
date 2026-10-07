@@ -89,8 +89,9 @@ solver::SolveResult ProductionSolver::solve(const solver::LinearModel& model) {
   report_.objective = result.objective_value;
   report_.primal_residual = result.primal_residual;
   report_.dual_residual = result.dual_residual;
-  report_.simplex_pricing_backend = result.statistics.pricing_backend.c_str();
-  report_.execution_backend = result.statistics.pricing_backend.c_str();
+  report_.simplex_pricing_backend =
+      result.statistics.pricing_backend == "CUDA" ? "CUDA" : "CPU";
+  report_.execution_backend = report_.simplex_pricing_backend;
 
   pipeline_report_ = pipeline_.report();
   report_.pipeline_pricing_backend = pipeline_report_.pricing_backend;

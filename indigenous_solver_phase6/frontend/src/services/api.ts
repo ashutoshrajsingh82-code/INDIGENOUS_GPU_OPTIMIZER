@@ -1,23 +1,77 @@
-export interface ApiConfig {
-  baseUrl: string;
-  timeoutMs: number;
-}
+import type { SolverConfiguration } from "../types/solverConfig";
+import type { ModelSummary } from "../types/model";
 
+export interface ApiConfig { baseUrl: string; timeoutMs: number; }
 export const apiConfig: ApiConfig = {
   baseUrl: import.meta.env.VITE_SOLVER_API_URL ?? "http://127.0.0.1:8080",
   timeoutMs: 15000,
 };
 
-export async function apiHealth(): Promise<boolean> {
+export interface SolverHealth {
+  status: "ok" | "degraded" | "unavailable";
+  executionBackend: "CPU" | "CUDA" | "UNKNOWN";
+  cudaCompiled: boolean;
+  cudaDeviceReady: boolean;
+  cpuFallbackEnabled: boolean;
+  version?: string;
+}
+
+export interface ModelInspectionResponse extends ModelSummary {
+  modelId: string;
+}
+
+export interface SolveRequest {
+  modelId: string;
+  configuration: SolverConfiguration;
+}
+
+export interface SolveResponse {
+  jobId: string;
+  status: "queued" | "running" | "optimal" | "infeasible" | "unbounded" | "iteration_limit" | "error";
+  message: string;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), apiConfig.timeoutMs);
   try {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), apiConfig.timeoutMs);
-    const response = await fetch(apiConfig.baseUrl + "/health", {
+    const response = await fetch(apiConfig.baseUrl + path, {
+      ...init,
       signal: controller.signal,
     });
+    const text = await response.text();
+    let body: unknown = undefined;
+    if (text) {
+      try { body = JSON.parse(text); } catch { body = { message: text }; }
+    }
+    if (!response.ok) {
+      const message = typeof body === "object" && body && "message" in body ? String((body as { message: unknown }).message) : "Solver API request failed.";
+      throw new Error(message);
+    }
+    return body as T;
+  } finally {
     window.clearTimeout(timer);
-    return response.ok;
-  } catch {
-    return false;
   }
+}
+
+export function apiHealth(): Promise<SolverHealth> {
+  return request<SolverHealth>("/health");
+}
+
+export function inspectModel(file: File): Promise<ModelInspectionResponse> {
+  const form = new FormData();
+  form.append("model", file);
+  return request<ModelInspectionResponse>("/models/inspect", { method: "POST", body: form });
+}
+
+export function solveModel(requestBody: SolveRequest): Promise<SolveResponse> {
+  return request<SolveResponse>("/solve", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(requestBody),
+  });
+}
+
+export function getSolveStatus(jobId: string): Promise<SolveResponse> {
+  return request<SolveResponse>("/solve/" + encodeURIComponent(jobId));
 }

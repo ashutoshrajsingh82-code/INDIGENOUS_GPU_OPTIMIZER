@@ -67,6 +67,7 @@ bool UnifiedGpuSolverPipeline::initialize_pricing(
 
 bool UnifiedGpuSolverPipeline::ftran(
     const std::vector<Real>& rhs, std::vector<Real>& solution) {
+  ScopedPerformanceTimer timer(profiler_, PerformanceProfiler::Stage::Ftran);
   if (!basis_initialized_ || rhs.size() != workspace_.dimension() ||
       !workspace_.ensure(UnifiedGpuWorkspace::BufferKind::Ftran, rhs.size()))
     return false;
@@ -97,6 +98,7 @@ bool UnifiedGpuSolverPipeline::ftran(
 
 bool UnifiedGpuSolverPipeline::btran(
     const std::vector<Real>& rhs, std::vector<Real>& solution) {
+  ScopedPerformanceTimer timer(profiler_, PerformanceProfiler::Stage::Btran);
   if (!basis_initialized_ || rhs.size() != workspace_.dimension() ||
       !workspace_.ensure(UnifiedGpuWorkspace::BufferKind::Btran, rhs.size()))
     return false;
@@ -127,6 +129,7 @@ bool UnifiedGpuSolverPipeline::btran(
 
 bool UnifiedGpuSolverPipeline::price(
     const std::vector<Real>& dual, std::vector<Real>& reduced_costs) {
+  ScopedPerformanceTimer timer(profiler_, PerformanceProfiler::Stage::Pricing);
   if (!pricing_initialized_ || dual.size() != workspace_.dimension()) return false;
   if (!stability_guard_.validate_input(dual).valid) {
     ++numerical_checks_;
@@ -230,6 +233,7 @@ bool UnifiedGpuSolverPipeline::coordinate_iteration(
     std::vector<Real>& dual,
     std::vector<Real>& reduced_costs,
     std::vector<Real>& direction) {
+  ScopedPerformanceTimer timer(profiler_, PerformanceProfiler::Stage::Coordination);
   if (!basis_initialized_ || !pricing_initialized_ ||
       btran_rhs.size() != workspace_.dimension() ||
       entering_column.size() != workspace_.dimension()) {
@@ -384,6 +388,7 @@ bool UnifiedGpuSolverPipeline::batch_coordinate_iteration(
     const VectorBatch& btran_rhs_batch,
     const VectorBatch& entering_column_batch,
     BatchIterationResult& result) {
+  ScopedPerformanceTimer timer(profiler_, PerformanceProfiler::Stage::Batch);
   std::lock_guard<std::mutex> lock(async_operation_mutex_);
   if (!basis_initialized_ || !pricing_initialized_ ||
       btran_rhs_batch.size() != entering_column_batch.size()) {
@@ -551,6 +556,9 @@ UnifiedGpuSolverPipeline::Report UnifiedGpuSolverPipeline::report() const noexce
   result.fallback_count = fallback_count_;
   result.maximum_residual = maximum_residual_;
   result.last_numerical_failure = last_numerical_failure_;
+  result.performance = profiler_.report();
+  profiler_.set_backend(result.gpu_active ? "CUDA" : "CPU");
+  result.performance = profiler_.report();
 
   return result;
 }

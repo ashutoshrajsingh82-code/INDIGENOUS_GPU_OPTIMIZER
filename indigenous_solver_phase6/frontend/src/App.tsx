@@ -4,6 +4,7 @@ import type { UploadedModel } from "./types/model";
 import type { SolverConfiguration } from "./types/solverConfig";
 import { defaultSolverConfiguration } from "./types/solverConfig";
 import { SolverConfigurationPanel } from "./components/SolverConfigurationPanel";
+import { LiveSolver } from "./components/LiveSolver";
 import { navigation, runtimeStatus, type SolverNavigationItem } from "./types/solver";
 import "./styles.css";
 
@@ -39,7 +40,7 @@ function App() {
           <div className="runtime-pill"><span className="status-dot" /> {runtimeStatus.backend} · CPU FALLBACK</div>
         </header>
 
-        {active === "dashboard" ? <Dashboard onNavigate={setActive} /> : active === "models" ? <ModelsView model={uploadedModel} onModelReady={setUploadedModel} /> : active === "solve" ? <SolveConfigurationView config={solverConfiguration} onChange={setSolverConfiguration} /> : <Placeholder label={activeItem.label} />}
+        {active === "dashboard" ? <Dashboard onNavigate={setActive} /> : active === "models" ? <ModelsView model={uploadedModel} onModelReady={setUploadedModel} /> : active === "solve" ? <SolveConfigurationView config={solverConfiguration} onChange={setSolverConfiguration} /> : active === "live" ? <LiveSolver model={uploadedModel} config={solverConfiguration} /> : <Placeholder label={activeItem.label} />}
 
         <footer className="footer">Indigenous GPU Optimizer · React/Vite foundation · Solver logic remains authoritative in C++</footer>
       </main>

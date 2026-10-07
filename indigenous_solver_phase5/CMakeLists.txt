@@ -9,6 +9,7 @@ add_library(indigenous_phase5_pipeline
   src/pipeline/unified_gpu_solver_pipeline.cpp
   src/pipeline/unified_gpu_workspace.cpp
   src/pipeline/adaptive_backend_selector.cpp
+  src/pipeline/async_execution_engine.cpp
 )
 target_include_directories(indigenous_phase5_pipeline PUBLIC include ../indigenous_solver_phase4/include ../indigenous_solver_phase3/include)
 target_link_libraries(indigenous_phase5_pipeline PUBLIC indigenous_phase4_basis indigenous_gpu_backend)
@@ -34,3 +35,18 @@ target_link_libraries(indigenous_phase5_adaptive_backend_selector_test PRIVATE i
 add_test(NAME indigenous_phase5_adaptive_backend_selector
   COMMAND indigenous_phase5_adaptive_backend_selector_test)
 message(STATUS "Phase 5.4 adaptive backend selection: workload-aware CPU/GPU policy")
+
+add_executable(indigenous_phase5_async_execution_engine_test
+  tests/async_execution_engine_test.cpp)
+target_link_libraries(indigenous_phase5_async_execution_engine_test
+  PRIVATE indigenous_phase5_pipeline)
+add_test(NAME indigenous_phase5_async_execution_engine
+  COMMAND indigenous_phase5_async_execution_engine_test)
+
+add_executable(indigenous_phase5_async_pipeline_test
+  tests/async_pipeline_test.cpp)
+target_link_libraries(indigenous_phase5_async_pipeline_test
+  PRIVATE indigenous_phase5_pipeline)
+add_test(NAME indigenous_phase5_async_pipeline
+  COMMAND indigenous_phase5_async_pipeline_test)
+message(STATUS "Phase 5.5 asynchronous execution: non-blocking pipeline task dispatch with CPU fallback")

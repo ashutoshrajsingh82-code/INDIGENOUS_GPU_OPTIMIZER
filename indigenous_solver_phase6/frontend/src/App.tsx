@@ -1,9 +1,12 @@
 import { useMemo, useState } from "react";
+import { ModelUpload } from "./components/ModelUpload";
+import type { UploadedModel } from "./types/model";
 import { navigation, runtimeStatus, type SolverNavigationItem } from "./types/solver";
 import "./styles.css";
 
 function App() {
   const [active, setActive] = useState<SolverNavigationItem["id"]>("dashboard");
+  const [uploadedModel, setUploadedModel] = useState<UploadedModel | null>(null);
   const activeItem = useMemo(
     () => navigation.find((item) => item.id === active) ?? navigation[0],
     [active],
@@ -32,7 +35,7 @@ function App() {
           <div className="runtime-pill"><span className="status-dot" /> {runtimeStatus.backend} · CPU FALLBACK</div>
         </header>
 
-        {active === "dashboard" ? <Dashboard /> : <Placeholder label={activeItem.label} />}
+        {active === "dashboard" ? <Dashboard onNavigate={setActive} /> : active === "models" ? <ModelsView model={uploadedModel} onModelReady={setUploadedModel} /> : <Placeholder label={activeItem.label} />}
 
         <footer className="footer">Indigenous GPU Optimizer · React/Vite foundation · Solver logic remains authoritative in C++</footer>
       </main>
@@ -40,7 +43,7 @@ function App() {
   );
 }
 
-function Dashboard() {
+function Dashboard({ onNavigate }: { onNavigate: (id: SolverNavigationItem["id"]) => void }) {
   const cards = [
     ["Execution", "CPU", "Active backend"],
     ["CUDA Device", "NOT READY", "NVIDIA device unavailable"],
@@ -79,7 +82,7 @@ function Dashboard() {
       <article className="panel activity">
         <div className="panel-heading"><div><span className="eyebrow">WORKFLOW</span><h3>Next actions</h3></div></div>
         <div className="action-grid">
-          <Action title="Upload model" text="Load an LP or MPS model for analysis." target="models" />
+          <button className="action-card" onClick={() => onNavigate("models")}><strong>Upload model <span>→</span></strong><small>Load an LP or MPS model for analysis.</small></button>
           <Action title="Configure solve" text="Choose iterations, tolerances, and backend policy." target="solve" />
           <Action title="View verification" text="Inspect regression and numerical validation." target="verification" />
           <Action title="Explore architecture" text="Trace the Phase 2–5 solver pipeline." target="architecture" />
@@ -106,3 +109,16 @@ function Placeholder({ label }: { label: string }) {
 }
 
 export default App;
+
+function ModelsView({ model, onModelReady }: { model: UploadedModel | null; onModelReady: (model: UploadedModel | null) => void }) {
+  return <section className="dashboard">
+    <div className="hero"><div><span className="eyebrow">PHASE 6.3 · MODEL INGESTION</span><h2>Model workspace</h2><p>Upload an LP or MPS model and validate it before the solver API receives it.</p></div><div className="hero-badge"><span className="status-dot" /> Parser boundary ready</div></div>
+    <div className="content-grid"><article className="panel"><div className="panel-heading"><div><span className="eyebrow">MODEL INPUT</span><h3>Select optimization model</h3></div></div><ModelUpload onModelReady={onModelReady} /></article>
+    <article className="panel"><div className="panel-heading"><div><span className="eyebrow">MODEL SUMMARY</span><h3>{model ? model.summary.name : "No model selected"}</h3></div>{model && <span className="badge">{model.summary.format}</span>}</div>
+    {model ? <><StatusRow label="Upload status" value={model.summary.status.toUpperCase()} ok={model.summary.status === "Ready"} /><StatusRow label="File size" value={formatBytes(model.summary.sizeBytes)} /><StatusRow label="Rows / columns" value={model.summary.rows + " / " + model.summary.columns} /><StatusRow label="Nonzeros" value={String(model.summary.nonzeros)} /><p className="model-message">{model.summary.message}</p></> : <p className="empty-state">Upload a valid .lp or .mps file to populate the model summary.</p>}
+    </article></div>
+    {model && <article className="panel activity"><div className="panel-heading"><div><span className="eyebrow">NEXT STEP</span><h3>Model accepted</h3></div></div><p className="model-message">The browser has validated the file type and size. Exact rows, columns, and nonzero counts will come from the C++ solver API in Phase 6.5.</p></article>}
+  </section>;
+}
+
+function formatBytes(bytes: number) { if (bytes < 1024) return bytes + " B"; if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"; return (bytes / (1024 * 1024)).toFixed(1) + " MB"; }

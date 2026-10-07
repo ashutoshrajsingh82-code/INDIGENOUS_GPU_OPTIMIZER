@@ -86,6 +86,6 @@ if(CMAKE_CUDA_COMPILER)
   add_test(NAME indigenous_phase4_cuda_btran_validation
            COMMAND indigenous_phase4_cuda_btran_validation_test)
 else()
-  message(STATUS "Phase 4.6 backend: CUDA toolchain unavailable; device representation target skipped")
+  message(STATUS "Phase 4.7 backend: CUDA toolchain unavailable; device representation target skipped")
 endif()
 

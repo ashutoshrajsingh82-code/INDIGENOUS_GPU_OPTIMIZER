@@ -10,6 +10,7 @@ add_library(indigenous_phase5_pipeline
   src/pipeline/unified_gpu_workspace.cpp
   src/pipeline/adaptive_backend_selector.cpp
   src/pipeline/async_execution_engine.cpp
+  src/pipeline/sparse_workload_planner.cpp
 )
 target_include_directories(indigenous_phase5_pipeline PUBLIC include ../indigenous_solver_phase4/include ../indigenous_solver_phase3/include)
 target_link_libraries(indigenous_phase5_pipeline PUBLIC indigenous_phase4_basis indigenous_gpu_backend)
@@ -58,3 +59,11 @@ target_link_libraries(indigenous_phase5_batch_multi_vector_pipeline_test
 add_test(NAME indigenous_phase5_batch_multi_vector_pipeline
   COMMAND indigenous_phase5_batch_multi_vector_pipeline_test)
 message(STATUS "Phase 5.6 batch/multi-vector operations: reusable batch API over Phase 3/4 backends")
+
+add_executable(indigenous_phase5_large_scale_sparse_test
+  tests/large_scale_sparse_pipeline_test.cpp)
+target_link_libraries(indigenous_phase5_large_scale_sparse_test
+  PRIVATE indigenous_phase5_pipeline)
+add_test(NAME indigenous_phase5_large_scale_sparse
+  COMMAND indigenous_phase5_large_scale_sparse_test)
+message(STATUS "Phase 5.7 large-scale sparse optimization: memory-aware sparse planning and bounded batching")

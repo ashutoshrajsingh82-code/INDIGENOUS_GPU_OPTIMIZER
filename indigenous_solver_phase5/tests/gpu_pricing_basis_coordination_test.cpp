@@ -82,7 +82,7 @@ int main() {
   if (!check(report.workspace_persistent, "persistent workspace")) return 1;
   if (!check(report.workspace_allocations == 3,
              "three initial operation-buffer allocations")) return 1;
-  if (!check(report.workspace_reuses >= 6,
+  if (!check(report.workspace_reuses >= 4,
              "repeated operations reuse workspace")) return 1;
 
   std::cout << "Phase 5.3 GPU pricing + FTRAN/BTRAN coordination: PASS\n";

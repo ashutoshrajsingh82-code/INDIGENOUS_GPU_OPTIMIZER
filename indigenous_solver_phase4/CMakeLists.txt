@@ -14,6 +14,8 @@ add_library(indigenous_phase4_basis
   ../indigenous_solver_phase2/src/linalg/sparse_lu.cpp
 )
 
+target_compile_definitions(indigenous_phase4_basis PUBLIC INDIGENOUS_PHASE4_CUDA_COMPILED=0)
+
 target_include_directories(indigenous_phase4_basis
   PUBLIC
     include
@@ -60,6 +62,7 @@ if(CMAKE_CUDA_COMPILER)
   enable_language(CUDA)
   message(STATUS "Phase 4.12 backend: CUDA toolchain detected")
   find_package(CUDAToolkit REQUIRED)
+  target_compile_definitions(indigenous_phase4_basis PUBLIC INDIGENOUS_PHASE4_CUDA_COMPILED=1)
 
   add_library(indigenous_phase4_cuda_basis src/gpu/cuda_basis_workspace.cu)
   target_include_directories(indigenous_phase4_cuda_basis

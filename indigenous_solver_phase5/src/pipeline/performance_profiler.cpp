@@ -10,7 +10,7 @@ void PerformanceProfiler::record(Stage stage, double ms) noexcept {
   if(s.calls==1){s.minimum_ms=ms;s.maximum_ms=ms;}else{s.minimum_ms=std::min(s.minimum_ms,ms);s.maximum_ms=std::max(s.maximum_ms,ms);}
   s.average_ms=s.total_ms/static_cast<double>(s.calls);
 }
-void PerformanceProfiler::set_backend(const char* b) noexcept { backend_=b?b:"UNKNOWN"; }
+void PerformanceProfiler::set_backend(const char* b) const noexcept { backend_=b?b:"UNKNOWN"; }
 PerformanceProfiler::Report PerformanceProfiler::report() const noexcept {
   Report r; r.coordination=at(stats_,Stage::Coordination); r.btran=at(stats_,Stage::Btran);
   r.pricing=at(stats_,Stage::Pricing); r.ftran=at(stats_,Stage::Ftran);

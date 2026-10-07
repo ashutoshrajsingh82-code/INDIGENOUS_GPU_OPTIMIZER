@@ -80,3 +80,22 @@ export function solveModel(requestBody: SolveRequest): Promise<SolveResponse> {
 export function getSolveStatus(jobId: string): Promise<SolveResponse> {
   return request<SolveResponse>("/solve/" + encodeURIComponent(jobId));
 }
+
+export interface SolveResultResponse {
+  jobId: string;
+  modelId: string;
+  status: "optimal" | "infeasible" | "unbounded" | "iteration_limit" | "error";
+  objective: number | null;
+  iterations: number;
+  elapsedMs: number;
+  variables: Array<{ name: string; value: number; reducedCost?: number | null; lowerBound?: number | null; upperBound?: number | null }>;
+  constraints: Array<{ name: string; activity: number; rhs: number; dualValue?: number | null; residual?: number | null }>;
+  certificate: { passed: boolean; primalResidual?: number; dualResidual?: number; complementarityResidual?: number; message: string };
+  backend: "CPU" | "CUDA" | "UNKNOWN";
+  gpuActive: boolean;
+  message: string;
+}
+
+export function getSolveResult(jobId: string): Promise<SolveResultResponse> {
+  return request<SolveResultResponse>("/solve/" + encodeURIComponent(jobId) + "/result");
+}

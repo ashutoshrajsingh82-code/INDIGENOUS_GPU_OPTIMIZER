@@ -1,5 +1,6 @@
 import type { SolverConfiguration } from "../types/solverConfig";
 import type { ModelSummary } from "../types/model";
+import type { RuntimeSnapshot } from "../types/runtime";
 
 export interface ApiConfig { baseUrl: string; timeoutMs: number; }
 export const apiConfig: ApiConfig = {
@@ -98,4 +99,8 @@ export interface SolveResultResponse {
 
 export function getSolveResult(jobId: string): Promise<SolveResultResponse> {
   return request<SolveResultResponse>("/solve/" + encodeURIComponent(jobId) + "/result");
+}
+
+export function getRuntimeSnapshot(): Promise<RuntimeSnapshot> {
+  return request<RuntimeSnapshot>("/runtime");
 }

@@ -78,7 +78,7 @@ int main() {
              "small pipeline remains non-large-scale")) return 1;
 
   const auto plan = pipeline.large_scale_plan();
-  if (!check(plan.nonzeros == 3, "exposed plan nonzeros")) return 1;
+  if (!check(report.sparse_nonzeros == 3, "exposed plan nonzeros")) return 1;
 
   std::cout << "Phase 5.7 large-scale sparse optimization: PASS\n";
   std::cout << "Planner: memory-aware sparse model planning | Strategy: "

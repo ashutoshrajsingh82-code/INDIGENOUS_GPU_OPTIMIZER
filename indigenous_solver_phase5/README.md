@@ -160,3 +160,45 @@ actually active.
 The Phase 5.5 asynchronous boundary remains separate. Batch operations are
 serialized against the shared persistent workspace so they cannot race an
 in-flight asynchronous operation.
+
+
+## Phase 5.7: Large-Scale Sparse LP Optimization
+Phase 5.7 adds a memory-aware sparse workload planner above the existing
+Phase 5.1-5.6 pipeline. It does not change simplex correctness or pretend
+that the current Intel machine is executing CUDA.
+
+### Large-scale planning
+`SparseWorkloadPlanner` derives a plan from:
+- row count,
+- column count,
+- sparse nonzero count,
+- configured memory budget,
+- preferred and maximum batch-vector counts.
+
+The planner classifies models as Small, Medium, Large, or VeryLarge. It also
+estimates the CSC representation footprint and bounds operation batching and
+column chunk sizes so large models do not require unbounded temporary
+materialization.
+
+### Integration
+`UnifiedGpuSolverPipeline` now automatically records the sparse model
+structure during basis/pricing initialization and exposes:
+- sparse model dimensions and NNZ,
+- scale classification,
+- estimated CSC bytes,
+- recommended batch-vector count,
+- bounded column chunk size,
+- selected sparse execution strategy.
+
+The default planning budget is 256 MiB, with 32 preferred batch vectors and
+256 as the maximum. These are planning defaults and can be overridden through
+`UnifiedGpuSolverPipeline::Options`.
+
+### Backend behavior
+On the current Intel-only machine, the planner remains backend-neutral:
+actual operations continue through CPU fallback paths. The planner prepares
+bounded sparse work for a future NVIDIA/CUDA backend without claiming GPU
+execution.
+
+Phase 5.7 is therefore an optimization-planning and memory-bounding stage,
+not yet a claim of end-to-end large-model GPU acceleration.

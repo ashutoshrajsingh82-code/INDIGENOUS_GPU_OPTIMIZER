@@ -10,6 +10,7 @@
 #include "pipeline/async_execution_engine.hpp"
 #include "pipeline/sparse_workload_planner.hpp"
 #include "pipeline/numerical_stability_guard.hpp"
+#include "pipeline/performance_profiler.hpp"
 
 namespace indigenous::pipeline {
 
@@ -77,6 +78,7 @@ public:
     std::size_t fallback_count = 0;
     double maximum_residual = 0.0;
     const char* last_numerical_failure = "NONE";
+    PerformanceProfiler::Report performance;
   };
 
   explicit UnifiedGpuSolverPipeline(Options options = {});
@@ -190,6 +192,7 @@ private:
   SparseWorkloadPlanner::Plan sparse_plan_;
   NumericalStabilityGuard stability_guard_;
   bool numerical_stable_ = true;
+  PerformanceProfiler profiler_;
   std::size_t numerical_checks_ = 0;
   std::size_t numerical_failures_ = 0;
   std::size_t fallback_count_ = 0;

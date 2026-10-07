@@ -224,6 +224,126 @@ bool UnifiedGpuSolverPipeline::wait_all_async() {
   return async_engine_.wait_all();
 }
 
+bool UnifiedGpuSolverPipeline::batch_ftran(
+    const VectorBatch& rhs_batch,
+    VectorBatch& solution_batch) {
+  std::lock_guard<std::mutex> lock(async_operation_mutex_);
+  if (!basis_initialized_) return false;
+
+  for (const auto& rhs : rhs_batch) {
+    if (rhs.size() != workspace_.dimension()) return false;
+  }
+
+  solution_batch.clear();
+  solution_batch.reserve(rhs_batch.size());
+  for (const auto& rhs : rhs_batch) {
+    std::vector<Real> solution;
+    if (!ftran(rhs, solution)) {
+      solution_batch.clear();
+      return false;
+    }
+    solution_batch.push_back(std::move(solution));
+  }
+
+  ++batch_calls_;
+  batch_vectors_processed_ += rhs_batch.size();
+  return true;
+}
+
+bool UnifiedGpuSolverPipeline::batch_btran(
+    const VectorBatch& rhs_batch,
+    VectorBatch& solution_batch) {
+  std::lock_guard<std::mutex> lock(async_operation_mutex_);
+  if (!basis_initialized_) return false;
+
+  for (const auto& rhs : rhs_batch) {
+    if (rhs.size() != workspace_.dimension()) return false;
+  }
+
+  solution_batch.clear();
+  solution_batch.reserve(rhs_batch.size());
+  for (const auto& rhs : rhs_batch) {
+    std::vector<Real> solution;
+    if (!btran(rhs, solution)) {
+      solution_batch.clear();
+      return false;
+    }
+    solution_batch.push_back(std::move(solution));
+  }
+
+  ++batch_calls_;
+  batch_vectors_processed_ += rhs_batch.size();
+  return true;
+}
+
+bool UnifiedGpuSolverPipeline::batch_price(
+    const VectorBatch& dual_batch,
+    VectorBatch& reduced_cost_batch) {
+  std::lock_guard<std::mutex> lock(async_operation_mutex_);
+  if (!pricing_initialized_) return false;
+
+  for (const auto& dual : dual_batch) {
+    if (dual.size() != workspace_.dimension()) return false;
+  }
+
+  reduced_cost_batch.clear();
+  reduced_cost_batch.reserve(dual_batch.size());
+  for (const auto& dual : dual_batch) {
+    std::vector<Real> reduced_costs;
+    if (!price(dual, reduced_costs)) {
+      reduced_cost_batch.clear();
+      return false;
+    }
+    reduced_cost_batch.push_back(std::move(reduced_costs));
+  }
+
+  ++batch_calls_;
+  batch_vectors_processed_ += dual_batch.size();
+  return true;
+}
+
+bool UnifiedGpuSolverPipeline::batch_coordinate_iteration(
+    const VectorBatch& btran_rhs_batch,
+    const VectorBatch& entering_column_batch,
+    BatchIterationResult& result) {
+  std::lock_guard<std::mutex> lock(async_operation_mutex_);
+  if (!basis_initialized_ || !pricing_initialized_ ||
+      btran_rhs_batch.size() != entering_column_batch.size()) {
+    return false;
+  }
+
+  for (const auto& rhs : btran_rhs_batch) {
+    if (rhs.size() != workspace_.dimension()) return false;
+  }
+  for (const auto& entering : entering_column_batch) {
+    if (entering.size() != workspace_.dimension()) return false;
+  }
+
+  result = {};
+  result.dual.reserve(btran_rhs_batch.size());
+  result.reduced_costs.reserve(btran_rhs_batch.size());
+  result.direction.reserve(btran_rhs_batch.size());
+
+  for (std::size_t i = 0; i < btran_rhs_batch.size(); ++i) {
+    std::vector<Real> dual;
+    std::vector<Real> reduced_costs;
+    std::vector<Real> direction;
+    if (!coordinate_iteration(btran_rhs_batch[i], entering_column_batch[i],
+                               dual, reduced_costs, direction)) {
+      result = {};
+      return false;
+    }
+    result.dual.push_back(std::move(dual));
+    result.reduced_costs.push_back(std::move(reduced_costs));
+    result.direction.push_back(std::move(direction));
+  }
+
+  result.success = true;
+  ++batch_calls_;
+  batch_vectors_processed_ += btran_rhs_batch.size();
+  return true;
+}
+
 bool UnifiedGpuSolverPipeline::initialized() const noexcept {
   return basis_initialized_ && pricing_initialized_;
 }
@@ -296,6 +416,12 @@ UnifiedGpuSolverPipeline::Report UnifiedGpuSolverPipeline::report() const noexce
   // running a CUDA backend; CPU async must never masquerade as GPU execution.
   result.async_gpu_capable = gpu_active();
   result.async_backend = gpu_active() ? "CUDA-ASYNC" : "CPU-ASYNC";
+  result.batch_calls = batch_calls_;
+  result.batch_vectors_processed = batch_vectors_processed_;
+  result.batch_available = true;
+  // Batch dispatch is backend-neutral. CPU-BATCH means the logical batch API
+  // is active while the underlying operations execute through CPU fallbacks.
+  result.batch_backend = gpu_active() ? "CUDA-BATCH" : "CPU-BATCH";
 
   return result;
 }

@@ -4,7 +4,7 @@
 int main() {
   solver::LinearModel model;
   model.name = "phase5_production_smoke";
-  model.minimize = true;
+  model.minimize = false;
   model.variables.resize(2);
   model.variables[0].name = "x";
   model.variables[1].name = "y";

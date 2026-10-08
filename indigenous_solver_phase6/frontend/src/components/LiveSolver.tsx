@@ -133,7 +133,16 @@ export function LiveSolver({ model, config, onJobCreated, onSolveComplete, onOpe
         <div className="live-toolbar-actions">
           <span className={terminal ? "live-state complete" : "live-state"}><span className="status-dot" /> {terminal ? "SOLVE COMPLETE" : statusLabel}</span>
           <span className="live-refresh">1s telemetry</span>
-          {result && <button onClick={onOpenResults}>Results ↗</button>}
+          {result ? (
+            <>
+              <button className="live-action secondary" onClick={onOpenResults}>FULL RESULTS ↗</button>
+              <button className="live-action solve-again" onClick={start} disabled={!canStart}>SOLVE AGAIN</button>
+            </>
+          ) : (
+            <button className="live-action solve-now" onClick={start} disabled={!canStart}>
+              {["submitting", "queued", "running"].includes(job.status) ? "SOLVING…" : "SOLVE"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -150,6 +159,26 @@ export function LiveSolver({ model, config, onJobCreated, onSolveComplete, onOpe
         <span>{result?.message ?? job.message}</span>
         {error && <em>{error}</em>}
       </div>
+
+      {!model && (
+        <div className="live-solve-cta">
+          <div>
+            <span className="eyebrow">SOLVER READY</span>
+            <strong>Upload an LP or MPS model to begin.</strong>
+            <p>Choose a model first, then return here to start the solve.</p>
+          </div>
+        </div>
+      )}
+      {model && !result && canStart && (
+        <div className="live-solve-cta ready">
+          <div>
+            <span className="eyebrow">READY TO SOLVE</span>
+            <strong>{model.summary.name}</strong>
+            <p>{model.summary.format} · {model.summary.rows ?? "—"} rows · {model.summary.columns ?? "—"} columns · backend {config.backendPolicy.toUpperCase()}</p>
+          </div>
+          <button className="live-main-solve" onClick={start}>▶ SOLVE MODEL</button>
+        </div>
+      )}
 
       <div className="live-overview-grid">
         <article className="live-panel live-identity">
@@ -207,6 +236,54 @@ export function LiveSolver({ model, config, onJobCreated, onSolveComplete, onOpe
         <TelemetryChart title="NUMERICAL RESIDUAL" value={result?.certificate.primalResidual === undefined ? "N/A" : result.certificate.primalResidual.toExponential(2)} subtitle="Primal certificate residual" mode={result ? Math.max(0, Math.min(100, 100 - Math.min(100, Math.abs(result.certificate.primalResidual ?? 0) * 1e12))) : 0} terminal={terminal} />
         <TelemetryChart title="WORKSPACE REUSE" value={runtime ? runtime.workspaceReuses.toLocaleString() : "N/A"} subtitle="Persistent workspace telemetry" mode={runtime ? Math.min(100, runtime.workspaceReuses) : 0} terminal={terminal} />
       </div>
+
+      {result && (
+        <section className="live-solved-results">
+          <div className="live-results-header">
+            <div>
+              <span className="eyebrow">SOLVE RESULT</span>
+              <h2>{successful ? "OPTIMAL SOLUTION" : statusLabel}</h2>
+              <p>Job {shortId(job.jobId)} · {result.backend} · {result.iterations} iterations · {result.elapsedMs.toFixed(3)} ms</p>
+            </div>
+            <div className="live-result-actions">
+              <span className={result.certificate.passed ? "live-result-pass" : "live-result-fail"}>
+                {result.certificate.passed ? "✓ CERTIFICATE PASS" : "✕ CERTIFICATE CHECK"}
+              </span>
+              <button className="live-main-solve" onClick={start} disabled={!canStart}>↻ SOLVE AGAIN</button>
+            </div>
+          </div>
+          <div className="live-result-summary">
+            <div><span>OBJECTIVE</span><strong>{formatNumber(result.objective)}</strong></div>
+            <div><span>STATUS</span><strong>{result.status.toUpperCase()}</strong></div>
+            <div><span>ITERATIONS</span><strong>{result.iterations}</strong></div>
+            <div><span>PRIMAL RESIDUAL</span><strong>{result.certificate.primalResidual.toExponential(3)}</strong></div>
+          </div>
+          <div className="live-result-tables">
+            <div className="live-result-table">
+              <div className="live-result-table-title"><span>VARIABLE SOLUTION</span><b>{result.variables.length} VARIABLES</b></div>
+              <div className="live-table-scroll">
+                <table><thead><tr><th>VARIABLE</th><th>VALUE</th><th>ABSOLUTE</th></tr></thead><tbody>
+                  {result.variables.slice(0, 20).map((item) => (
+                    <tr key={item.name}><td>{item.name}</td><td>{formatNumber(item.value)}</td><td>{formatNumber(Math.abs(item.value))}</td></tr>
+                  ))}
+                </tbody></table>
+              </div>
+              {result.variables.length > 20 && <small>Showing first 20 of {result.variables.length} variables. Open Full Results for the complete solution.</small>}
+            </div>
+            <div className="live-result-table">
+              <div className="live-result-table-title"><span>CONSTRAINT RESIDUALS</span><b>{result.constraints.length} CONSTRAINTS</b></div>
+              <div className="live-table-scroll">
+                <table><thead><tr><th>CONSTRAINT</th><th>RESIDUAL</th><th>ABSOLUTE</th></tr></thead><tbody>
+                  {result.constraints.slice(0, 20).map((item) => (
+                    <tr key={item.name}><td>{item.name}</td><td>{formatNumber(item.residual)}</td><td>{formatNumber(Math.abs(item.residual))}</td></tr>
+                  ))}
+                </tbody></table>
+              </div>
+              {result.constraints.length > 20 && <small>Showing first 20 of {result.constraints.length} constraints. Open Full Results for the complete solution.</small>}
+            </div>
+          </div>
+        </section>
+      )}
 
       <div className="live-footer-state">
         <div><span className="eyebrow">POST-SOLVE OBSERVABILITY</span><strong>{successful ? "Solution available · verification state is authoritative" : terminal ? "Terminal solver state" : "Live execution telemetry"}</strong><p>{runtime?.message ?? "Telemetry is sourced from the native C++ API. GPU hardware metrics are shown only when the backend reports them."}</p></div>

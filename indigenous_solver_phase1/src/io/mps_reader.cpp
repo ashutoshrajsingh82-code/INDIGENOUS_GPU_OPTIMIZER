@@ -77,7 +77,7 @@ bool read_mps(const std::string& path,LinearModel& m,std::string& e){std::ifstre
   // Free-field continuation pair, when present. A blank optional second
   // coefficient is legal in fixed-field MPS, so a row name without a
   // numeric value is ignored rather than reported as a parser failure.
-  std::string rr;Real vv;
+  std::string rr;Real vv;bool second_added=false;
   while(s>>rr){
     if(!(s>>vv)){
       // If this is a fixed-field record, the optional second value may be
@@ -85,11 +85,12 @@ bool read_mps(const std::string& path,LinearModel& m,std::string& e){std::ifstre
       break;
     }
     entries.emplace_back(var,rr,vv);
+    second_added=true;
   }
 
-  // If whitespace tokenization consumed only the first pair, recover a
-  // second fixed-width pair when the canonical fields contain it.
-  if(line.size()>=61){
+  // If whitespace tokenization did not provide a second pair, recover it
+  // from the canonical fixed-width fields.
+  if(!second_added && line.size()>=61){
     std::string fixed_row2=line.substr(39,8);
     std::string fixed_value2=line.substr(49,12);
     std::istringstream r2s(fixed_row2);

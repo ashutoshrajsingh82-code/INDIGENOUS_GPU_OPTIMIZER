@@ -15,4 +15,5 @@ export interface ModelSummary {
 export interface UploadedModel {
   file: File;
   summary: ModelSummary;
+  modelId?: string;
 }

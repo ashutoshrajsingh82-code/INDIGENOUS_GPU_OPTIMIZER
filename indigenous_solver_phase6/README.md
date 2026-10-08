@@ -1,45 +1,42 @@
-# Indigenous Solver Phase 6
+# Phase 6 Native Solver API
 
-Phase 6 is the web application layer for the Indigenous GPU Optimizer.
+The Phase 6 API is a thin native HTTP boundary around the existing Phase 5 `ProductionSolver`.
 
-## Roadmap
+## Build
 
-6.1 React/Vite foundation  
-6.2 Dashboard  
-6.3 Upload LP/MPS  
-6.4 Solver configuration  
-6.5 API integration  
-6.6 Live solver screen  
-6.7 Results + solution explorer  
-6.8 GPU monitoring  
-6.9 Benchmark dashboard  
-6.10 Verification dashboard  
-6.11 Architecture visualization  
-6.12 Export/reporting
+From a Visual Studio 2022 x64 developer command prompt:
 
-## 6.1 React/Vite foundation
+```cmd
+cd C:\Users\ASHUTOSH\INDIGENOUS_GPU_OPTIMIZER\INDIGENOUS_GPU_OPTIMIZER
+cmake -S indigenous_solver_phase6 -B indigenous_solver_phase6\build -G "NMake Makefiles"
+cmake --build indigenous_solver_phase6\build
+```
 
-The foundation provides:
+Run:
 
-- React + TypeScript application shell
-- Vite development/build tooling
-- typed solver runtime models
-- solver-oriented navigation placeholders
-- explicit CPU/CUDA runtime state
-- separate API boundary for later backend integration
-- responsive desktop/tablet/mobile layout
-- no false GPU activation on CPU-only hosts
+```cmd
+indigenous_solver_phase6\build\indigenous_phase6_api_server.exe --port 8080
+```
 
-## Run
+The server binds only to `127.0.0.1`.
 
-From the repository root:
+## Endpoints
 
-    cd indigenous_solver_phase6\frontend
-    npm install
-    npm run typecheck
-    npm run build
-    npm run dev
+- `GET /health`
+- `POST /models/inspect` — multipart field `model`
+- `POST /solve` — JSON `{ modelId, configuration }`
+- `GET /solve/{jobId}`
+- `GET /solve/{jobId}/result`
+- `GET /runtime`
+- `GET /verification`
+- `GET /benchmarks`
+- `GET /reports/latest`
+- `GET /reports/{jobId}`
 
-Open the local Vite URL shown in the terminal, normally http://127.0.0.1:5173.
+The API stores inspected models and completed jobs in process memory. Restarting the server clears them.
 
-Phase 6.1 does not require a solver API. API integration is intentionally deferred to 6.5.
+## GPU behavior
+
+The API does not claim CUDA execution when the machine has no CUDA runtime/device. On the current Intel-only development machine, the authoritative backend remains CPU. A request with `backendPolicy=cuda` is rejected instead of silently falling back.
+
+The existing Phase 3/4/5 CUDA auto-detection remains authoritative when this project is built on an NVIDIA/CUDA machine.

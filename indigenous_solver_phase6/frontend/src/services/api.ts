@@ -2,6 +2,7 @@ import type { SolverConfiguration } from "../types/solverConfig";
 import type { ModelSummary } from "../types/model";
 import type { RuntimeSnapshot } from "../types/runtime";
 import type { VerificationSnapshot } from "../types/verification";
+import type { ReportResponse } from "../types/report";
 
 export interface ApiConfig { baseUrl: string; timeoutMs: number; }
 export const apiConfig: ApiConfig = {
@@ -114,4 +115,9 @@ export function getBenchmarkSnapshot(): Promise<BenchmarkSnapshot> {
 
 export function getVerificationSnapshot(): Promise<VerificationSnapshot> {
   return request<VerificationSnapshot>("/verification");
+}
+
+export function getReport(jobId: string | null): Promise<ReportResponse> {
+  const path = jobId ? "/reports/" + encodeURIComponent(jobId) : "/reports/latest";
+  return request<ReportResponse>(path);
 }

@@ -1,40 +1,28 @@
-# Phase 6.5 — API Integration
+# Phase 6 Native API Contract
 
-This phase establishes the browser-to-solver API boundary.
+The C++ API owns model parsing, optimization, certificates, runtime state, and report generation. React only calls these endpoints.
 
-## API contract
+## Endpoints
 
-Default development server:
+- `GET /health`
+- `POST /models/inspect`
+- `POST /solve`
+- `GET /solve/{jobId}`
+- `GET /solve/{jobId}/result`
+- `GET /runtime`
+- `GET /verification`
+- `GET /benchmarks`
+- `GET /reports/latest`
+- `GET /reports/{jobId}`
 
-`http://127.0.0.1:8080`
+## Report ownership
 
-Endpoints:
+`GET /reports/{jobId}` returns the authoritative completed-job snapshot. It contains the Phase 5 ProductionSolver result, certificate, runtime state, verification summary, and model metadata.
 
-- `GET /health` — runtime/backend health.
-- `POST /models/inspect` — multipart field `model`; returns authoritative LP/MPS dimensions and a `modelId`.
-- `POST /solve` — accepts `{ modelId, configuration }`; returns a `jobId`.
-- `GET /solve/{jobId}` — returns solve status.
+Benchmark data is returned as unavailable until the benchmark service is connected to the API. It is never fabricated.
 
-The React application does not execute the optimization algorithm. The authoritative implementation remains the C++ ProductionSolver/Phase 5 pipeline.
+## Runtime model
 
-## Configuration handoff
+Jobs are solved synchronously in the native API implementation, but the frontend polling contract remains compatible. Inspected models and completed jobs are process-local; restarting the server clears them.
 
-The Phase 6.4 configuration is serialized without transformation:
-
-- revised-simplex method
-- backend policy
-- maximum iterations
-- relative/absolute/pivot tolerances
-- CPU fallback
-- numerical validation
-- profiling
-
-## Development
-
-Set `VITE_SOLVER_API_URL` when the API is not on port 8080.
-
-Example:
-
-`VITE_SOLVER_API_URL=http://127.0.0.1:8080`
-
-If the API is not running, the frontend must report the connection failure rather than fabricate solver results.
+The native server binds to localhost and is intended as the Phase 6 local development boundary.

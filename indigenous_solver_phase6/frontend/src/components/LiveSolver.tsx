@@ -256,7 +256,7 @@ export function LiveSolver({ model, config, onJobCreated, onSolveComplete, onOpe
             <div><span>OBJECTIVE</span><strong>{formatNumber(result.objective)}</strong></div>
             <div><span>STATUS</span><strong>{result.status.toUpperCase()}</strong></div>
             <div><span>ITERATIONS</span><strong>{result.iterations}</strong></div>
-            <div><span>PRIMAL RESIDUAL</span><strong>{result.certificate.primalResidual.toExponential(3)}</strong></div>
+            <div><span>PRIMAL RESIDUAL</span><strong>{(result.certificate.primalResidual ?? NaN).toExponential(3)}</strong></div>
           </div>
           <div className="live-result-tables">
             <div className="live-result-table">
@@ -345,7 +345,7 @@ function shortId(value: string | null | undefined) {
   return value.length > 18 ? value.slice(0, 8) + "…" + value.slice(-6) : value;
 }
 
-function formatNumber(value: number) {
-  if (!Number.isFinite(value)) return "N/A";
+function formatNumber(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "N/A";
   return Math.abs(value) >= 100000 || (Math.abs(value) > 0 && Math.abs(value) < 0.0001) ? value.toExponential(4) : value.toFixed(4);
 }

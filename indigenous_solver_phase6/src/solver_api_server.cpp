@@ -85,6 +85,9 @@ std::string jn(double v) {
 
 std::string ju(std::size_t v) { return std::to_string(v); }
 
+// Forward declaration used by benchmark/report JSON builders below.
+std::string now_utc_iso();
+
 std::string status_string(solver::SolveStatus s) {
   switch (s) {
     case solver::SolveStatus::Optimal: return "optimal";

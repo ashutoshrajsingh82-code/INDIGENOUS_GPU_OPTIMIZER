@@ -7,6 +7,7 @@
 #include <cmath>
 #include <iostream>
 #include <chrono>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -83,6 +84,15 @@ std::string jn(double v) {
 std::string ju(std::size_t v) { return std::to_string(v); }
 
 std::string status_string(solver::SolveStatus s) {
+  switch (s) {
+    case solver::SolveStatus::Optimal: return "optimal";
+    case solver::SolveStatus::Infeasible: return "infeasible";
+    case solver::SolveStatus::Unbounded: return "unbounded";
+    case solver::SolveStatus::IterationLimit: return "iteration_limit";
+    default: return "error";
+  }
+}
+std::string status_message(solver::SolveStatus s) {
   return solver::to_string(s);
 }
 
@@ -314,7 +324,7 @@ void handle(SOCKET s) {
       std::ostringstream out;
       out<<"{\"modelId\":"<<js(id)<<",\"name\":"<<js(model.name)
          <<",\"format\":"<<js(extension_format(filename))
-         <<",\"rows\":"<<ju(model.constraints.size())<<",\"columns\":"<<ju(model.variables.size())
+         <<",\"sizeBytes\":"<<ju(bytes.size())<<",\"status\":\"Ready\",\"message\":\"Model parsed successfully.\",\"rows\":"<<ju(model.constraints.size())<<",\"columns\":"<<ju(model.variables.size())
          <<",\"nonzeros\":"<<ju(model.A.values().size())<<",\"valid\":true}";
       send_response(s,200,out.str());
     } else if(req.method=="POST" && req.target=="/solve") {

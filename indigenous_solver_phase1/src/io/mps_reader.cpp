@@ -34,7 +34,25 @@ bool read_mps(const std::string& path,LinearModel& m,std::string& e){std::ifstre
     continue;
   }
  if(sec==ROWS){std::string typ,name;std::istringstream s(line);s>>typ>>name;if(typ.size()!=1){e="MPS ROWS parse error at line "+std::to_string(ln);return false;}char t=typ[0];if(t=='N'){if(objrow.empty())objrow=name;else row[name]=(int)m.constraints.size();}else if(t=='L'||t=='G'||t=='E'){Constraint c;c.name=name;if(t=='L')c.upper_bound=0;else if(t=='G')c.lower_bound=0;else c.lower_bound=c.upper_bound=0;row[name]=(int)m.constraints.size();sense[name]=t;m.constraints.push_back(c);}else{e="unsupported ROW type at line "+std::to_string(ln);return false;}}
- else if(sec==COLUMNS){std::string var,r1;Real v1;std::istringstream s(line);s>>var>>r1>>v1;if(!s){e="MPS COLUMNS parse error at line "+std::to_string(ln);return false;}if(!vi.count(var)){vi[var]=(int)vars.size();vars.push_back(var);}entries.emplace_back(var,r1,v1);std::string rr;Real vv;while(s>>rr>>vv)entries.emplace_back(var,rr,vv);}
+ else if(sec==COLUMNS){
+  // Netlib MPS files may contain integer-section marker records such as:
+  //   MARK0000  'MARKER'                 'INTORG'
+  //   MARK0001  'MARKER'                 'INTEND'
+  // These are structural records, not numeric matrix entries. The solver
+  // currently treats all variables as continuous, so the markers can be
+  // safely ignored after recognizing them.
+  std::string var,r1;Real v1;std::istringstream s(line);s>>var>>r1;
+  if(!s){e="MPS COLUMNS parse error at line "+std::to_string(ln);return false;}
+  if(r1=="'MARKER'" || r1=="MARKER"){continue;}
+  if(!(s>>v1)){e="MPS COLUMNS numeric value parse error at line "+std::to_string(ln);return false;}
+  if(!vi.count(var)){vi[var]=(int)vars.size();vars.push_back(var);}
+  entries.emplace_back(var,r1,v1);
+  std::string rr;Real vv;
+  while(s>>rr){
+    if(!(s>>vv)){e="MPS COLUMNS continuation value parse error at line "+std::to_string(ln);return false;}
+    entries.emplace_back(var,rr,vv);
+  }
+}
  else if(sec==RHS){std::istringstream s(line);std::vector<std::string> tok;std::string t;while(s>>t)tok.push_back(t);if(tok.empty())continue;const bool has_set=(tok.size()%2)==1;const std::size_t start=has_set?1:0;if(tok.size()<start+2||((tok.size()-start)%2)!=0){e="MPS RHS parse error at line "+std::to_string(ln);return false;}for(std::size_t k=start;k<tok.size();k+=2){Real v;std::istringstream vs(tok[k+1]);if(!(vs>>v)){e="MPS RHS value parse error at line "+std::to_string(ln);return false;}rhs[tok[k]]=v;}}
  else if(sec==BOUNDS){std::string typ,set,var;Real val=0;std::istringstream s(line);s>>typ>>set>>var;if(!s){e="MPS BOUNDS parse error at line "+std::to_string(ln);return false;}if(typ!="LO"&&typ!="UP"&&typ!="FX"&&typ!="FR"){e="unsupported BOUNDS type "+typ;return false;}if(typ!="FR"&&! (s>>val)){e="missing bound value at line "+std::to_string(ln);return false;}if(!vi.count(var)){vi[var]=(int)vars.size();vars.push_back(var);}if(typ=="LO"){lo[var]=val;haslo[var]=true;}else if(typ=="UP"){up[var]=val;hasup[var]=true;}else if(typ=="FX"){lo[var]=up[var]=val;haslo[var]=hasup[var]=true;}else{lo[var]=-kInfinity;up[var]=kInfinity;haslo[var]=hasup[var]=true;}}
  }

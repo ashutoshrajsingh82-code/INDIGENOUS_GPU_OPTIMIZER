@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { UploadedModel } from "../types/model";
 import type { SolverConfiguration } from "../types/solverConfig";
 import { getRuntimeSnapshot, getSolveResult, getSolveStatus, inspectModel, solveModel } from "../services/api";
@@ -223,7 +223,7 @@ function LiveGauge({ title, value, display, tone }: { title: string; value: numb
   const safe = Math.max(0, Math.min(100, value));
   return <article className={"live-panel live-gauge " + tone}>
     <div className="live-panel-title"><span>{title}</span><b>{tone === "good" ? "OK" : tone === "warn" ? "CHECK" : "N/A"}</b></div>
-    <div className="live-gauge-body"><div className="live-gauge-arc" style={{ "--gauge-value": safe * 2.7 + "deg" } as React.CSSProperties}><div><strong>{display}</strong><small>TELEMETRY</small></div></div></div>
+    <div className="live-gauge-body"><div className="live-gauge-arc" style={{ "--gauge-value": safe * 2.7 + "deg" } as CSSProperties}><div><strong>{display}</strong><small>TELEMETRY</small></div></div></div>
   </article>;
 }
 

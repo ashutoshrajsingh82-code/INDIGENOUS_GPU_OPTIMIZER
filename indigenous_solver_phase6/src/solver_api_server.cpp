@@ -103,6 +103,31 @@ bool load_model(const std::string& path, LinearModel& model, std::string& error)
   return solver::read_lp(path, model, error);
 }
 
+std::optional<std::string> json_string_field(const std::string& body, const std::string& key) {
+  const auto k = body.find("\"" + key + "\"");
+  if (k == std::string::npos) return std::nullopt;
+  const auto colon = body.find(':', k);
+  if (colon == std::string::npos) return std::nullopt;
+  const auto q1 = body.find('"', colon + 1);
+  if (q1 == std::string::npos) return std::nullopt;
+  const auto q2 = body.find('"', q1 + 1);
+  if (q2 == std::string::npos) return std::nullopt;
+  return body.substr(q1 + 1, q2 - q1 - 1);
+}
+std::optional<std::size_t> json_size_field(const std::string& body, const std::string& key) {
+  const auto k = body.find("\"" + key + "\"");
+  if (k == std::string::npos) return std::nullopt;
+  const auto colon = body.find(':', k);
+  if (colon == std::string::npos) return std::nullopt;
+  std::size_t end = colon + 1;
+  while (end < body.size() && std::isspace(static_cast<unsigned char>(body[end]))) ++end;
+  const auto first = end;
+  while (end < body.size() && std::isdigit(static_cast<unsigned char>(body[end]))) ++end;
+  if (first == end) return std::nullopt;
+  try { return static_cast<std::size_t>(std::stoull(body.substr(first, end - first))); }
+  catch (...) { return std::nullopt; }
+}
+
 std::string extension_format(const std::string& path) {
   const auto p = path.find_last_of('.');
   if (p == std::string::npos) return "LP";
@@ -337,7 +362,16 @@ void handle(SOCKET s) {
       if(path.empty()){send_response(s,404,R"({"message":"unknown modelId"})");closesocket(s);return;}
       Job job; job.id=make_id("job"); job.model_id=model_id; job.model_path=path; job.started=std::chrono::steady_clock::now();
       std::string error; if(!load_model(path,job.model,error)){send_response(s,400,"{\"message\":"+js(error)+"}");closesocket(s);return;}
-      ProductionSolver production; job.result=production.solve(job.model); job.report=production.report();
+      ProductionSolver::Options options;
+      if (const auto max_it = json_size_field(req.body, "maxIterations"))
+        options.simplex.max_iterations = *max_it;
+      const auto backend_policy = json_string_field(req.body, "backendPolicy");
+      if (backend_policy && *backend_policy == "cuda") {
+        send_response(s,400,R"({"message":"CUDA backend was requested, but this build has no CUDA runtime/device."})");
+        closesocket(s); return;
+      }
+      ProductionSolver production(options);
+      job.result=production.solve(job.model); job.report=production.report();
       if(!job.result.primal.empty()) job.certificate=solver::validate_solution(job.model,job.result.primal,job.result.objective_value);
       job.elapsed_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-job.started).count();
       job.status=status_string(job.result.status);

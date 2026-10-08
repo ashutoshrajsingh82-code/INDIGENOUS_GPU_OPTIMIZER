@@ -321,14 +321,60 @@ std::string benchmark_snapshot_json() {
    * validated basis backend, not a full revised-simplex replacement.
    * No synthetic Phase 4 timing is generated.
    */
-  const fs::path root = fs::current_path().parent_path();
-  const fs::path models_path = root / "benchmarks" / "netlib";
+  // Resolve the benchmark data root independently of the process working directory.
+  // The current repository has Phase 6 at the outer root while Phase 2 and
+  // the Netlib models are stored in the nested INDIGENOUS_GPU_OPTIMIZER tree.
+  fs::path outer_root = fs::current_path();
+
+  for (int depth = 0; depth < 8; ++depth) {
+    const fs::path nested_repo =
+        outer_root / "INDIGENOUS_GPU_OPTIMIZER";
+
+    if (fs::exists(outer_root / "benchmarks" / "netlib") ||
+        fs::exists(nested_repo / "benchmarks" / "netlib")) {
+      break;
+    }
+
+    const fs::path parent = outer_root.parent_path();
+    if (parent == outer_root) {
+      break;
+    }
+
+    outer_root = parent;
+  }
+
+  fs::path data_root = outer_root;
+
+  if (!fs::exists(data_root / "benchmarks" / "netlib")) {
+    const fs::path nested_repo =
+        outer_root / "INDIGENOUS_GPU_OPTIMIZER";
+
+    if (fs::exists(nested_repo / "benchmarks" / "netlib")) {
+      data_root = nested_repo;
+    }
+  }
+
+  const fs::path models_path =
+      data_root / "benchmarks" / "netlib";
+
   const fs::path phase2_exe =
-      root / "indigenous_solver_phase2" / "build" / "Release" /
+      data_root / "indigenous_solver_phase2" /
+      "build" / "Release" /
       "solver_phase2_cli.exe";
-  const fs::path phase3_exe =
-      root / "indigenous_solver_phase3" / "build" / "Release" /
+
+  fs::path phase3_exe =
+      data_root / "indigenous_solver_phase3" /
+      "build" / "Release" /
       "solver_phase3_cli.exe";
+
+  // In the current Phase 6 build tree, Phase 3 is embedded under Phase 5.
+  if (!fs::exists(phase3_exe)) {
+    phase3_exe =
+        outer_root / "indigenous_solver_phase6" /
+        "build" / "phase5_build" /
+        "phase3_build" / "Release" /
+        "solver_phase3_cli.exe";
+  }
 
   const std::vector<std::string> models = {
       "afiro", "adlittle", "blend", "bore3d", "brandy",
@@ -583,7 +629,7 @@ std::string report_json(const Job& job) {
   out << "{"
       << "\"status\":\"ok\",\"report\":{"
       << "\"reportId\":" << js("report-" + job.id)
-      << ",\"generatedAt\":" << js("2026-10-08T00:00:00Z")
+      << ",\"generatedAt\":" << js(now_utc_iso())
       << ",\"jobId\":" << js(job.id)
       << ",\"model\":{\"name\":" << js(job.model.name)
       << ",\"modelId\":" << js(job.model_id)

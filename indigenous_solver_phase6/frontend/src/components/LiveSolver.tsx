@@ -203,7 +203,7 @@ export function LiveSolver({ model, config, onJobCreated, onSolveComplete, onOpe
 
       <div className="live-chart-grid">
         <TelemetryChart title="SOLVE PROGRESS" value={Math.round(progress) + "%"} subtitle="Authoritative job progress" mode={progress} terminal={terminal} />
-        <TelemetryChart title="OBJECTIVE" value={objective === null ? "N/A" : formatNumber(objective)} subtitle="Final solver objective" mode={result ? 100 : 0} terminal={terminal} />
+        <TelemetryChart title="OBJECTIVE" value={objective === null ? "N/A" : formatNumber(objective)} subtitle="Final solver objective · single sample" mode={result ? 50 : 0} terminal={terminal} />
         <TelemetryChart title="NUMERICAL RESIDUAL" value={result?.certificate.primalResidual === undefined ? "N/A" : result.certificate.primalResidual.toExponential(2)} subtitle="Primal certificate residual" mode={result ? Math.max(0, Math.min(100, 100 - Math.min(100, Math.abs(result.certificate.primalResidual ?? 0) * 1e12))) : 0} terminal={terminal} />
         <TelemetryChart title="WORKSPACE REUSE" value={runtime ? runtime.workspaceReuses.toLocaleString() : "N/A"} subtitle="Persistent workspace telemetry" mode={runtime ? Math.min(100, runtime.workspaceReuses) : 0} terminal={terminal} />
       </div>
@@ -238,12 +238,12 @@ function LiveStatusRow({ label, value, active }: { label: string; value: string;
 
 function TelemetryChart({ title, value, subtitle, mode, terminal }: { title: string; value: string; subtitle: string; mode: number; terminal: boolean }) {
   const height = 92;
-  const points = [12, 20, 17, 26, 23, 34, 31, 45, 43, 58, 54, 68, 64, 76, 73, Math.max(8, Math.min(92, mode))];
+  const current = Math.max(8, Math.min(92, mode));\n  const points = Array.from({ length: 16 }, () => current);
   const polyline = points.map((p, i) => (i * 100 / (points.length - 1)).toFixed(1) + "," + (height - p)).join(" ");
   return <article className="live-panel live-chart-panel">
     <div className="live-chart-heading"><div><span>{title}</span><small>{subtitle}</small></div><strong>{value}</strong></div>
     <div className="live-chart"><div className="live-grid-lines"><i/><i/><i/><i/></div><svg viewBox={"0 0 100 " + height} preserveAspectRatio="none" aria-hidden="true"><polyline points={polyline} fill="none" vectorEffect="non-scaling-stroke" /></svg></div>
-    <div className="live-chart-meta"><span>START</span><span>{terminal ? "POST-SOLVE" : "LIVE"}</span></div>
+    <div className="live-chart-meta"><span>SAMPLE</span><span>{terminal ? "POST-SOLVE" : "LIVE"}</span></div>
   </article>;
 }
 

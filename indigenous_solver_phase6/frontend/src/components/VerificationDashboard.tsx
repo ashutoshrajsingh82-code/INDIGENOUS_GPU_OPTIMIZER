@@ -191,7 +191,7 @@ export function VerificationDashboard() {
           <EnvironmentRow label="OS" value="-" />
           <EnvironmentRow label="python" value="-" />
           <EnvironmentRow label="numpy" value="-" />
-          <EnvironmentRow label="cuda" value={runtime?.cudaCompiled ? (runtime.version ?? "-") : "-"} />
+          <EnvironmentRow label="cuda" value="-" />
         </div>
       </section>
 

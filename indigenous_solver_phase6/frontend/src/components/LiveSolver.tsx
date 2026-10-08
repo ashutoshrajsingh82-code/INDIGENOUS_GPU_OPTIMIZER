@@ -57,8 +57,9 @@ export function LiveSolver({ model, config, onJobCreated, onSolveComplete }: Pro
       onJobCreated?.(response.jobId);
       if (response.status === "queued" || response.status === "running") { poll(response.jobId); } else { onSolveComplete?.(response.jobId); }
     } catch (err) {
-      setJob((current) => ({ ...current, status: "error", message: err instanceof Error ? err.message : "Solver submission failed.", updatedAt: new Date().toISOString() }));
-      setError("Could not connect to the solver API. No solve was executed by the browser.");
+      const message = err instanceof Error ? err.message : "Solver submission failed.";
+      setJob((current) => ({ ...current, status: "error", message, updatedAt: new Date().toISOString() }));
+      setError("Solver API error: " + message);
     }
   };
 

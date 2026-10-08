@@ -1,201 +1,42 @@
 import { useCallback, useEffect, useState } from "react";
-import { getRuntimeSnapshot, getVerificationSnapshot } from "../services/api";
-import type { RuntimeSnapshot } from "../types/runtime";
+import { getVerificationSnapshot } from "../services/api";
 import type { VerificationSnapshot, VerificationCheck } from "../types/verification";
 
-function statusIcon(status: VerificationCheck["status"]) {
-  if (status === "passed") return "✓";
-  if (status === "failed") return "×";
-  return "−";
+function CheckRow({check}:{check:VerificationCheck}) {
+ const tone=check.status==="passed"?"ok":check.status==="failed"?"error":"muted";
+ return <div className="verification-check"><div><strong>{check.name}</strong><small>{check.category} · {check.message}</small></div><span className={"verification-status "+tone}>{check.status.toUpperCase()}</span></div>;
 }
-
-function statusClass(status: VerificationCheck["status"]) {
-  if (status === "passed") return "verification-pass";
-  if (status === "failed") return "verification-fail";
-  return "verification-muted";
+function Coverage({label,value}:{label:string;value:number|null}) {
+ return <div className="status-row"><span>{label}</span><strong>{value===null?"NOT REPORTED":value}</strong></div>;
 }
-
-function formatNumber(value: number | null | undefined, digits = 6) {
-  if (value === null || value === undefined || !Number.isFinite(value)) return "-";
-  return value.toFixed(digits);
+function StatusLine({label,value,ok=false}:{label:string;value:string;ok?:boolean}) {
+ return <div className="status-row"><span>{label}</span><strong><i className={ok?"status-dot":"status-dot muted"}/>{value}</strong></div>;
 }
-
-function formatTimestamp(value: string | undefined) {
-  if (!value) return "-";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toISOString();
-}
-
-function CheckRow({ check }: { check: VerificationCheck }) {
-  const relErr = check.status === "passed" || check.status === "failed" ? "-" : "-";
-  return (
-    <tr>
-      <td className={"verification-icon " + statusClass(check.status)}>{statusIcon(check.status)}</td>
-      <td>{check.name}</td>
-      <td className="verification-muted-text">{check.category}</td>
-      <td className="verification-number">{check.durationMs == null ? "-" : formatNumber(check.durationMs, 3) + " ms"}</td>
-      <td className="verification-number">{relErr}</td>
-      <td className="verification-number">-</td>
-    </tr>
-  );
-}
-
-function SummaryCell({ label, value, tone = "normal" }: { label: string; value: string; tone?: "normal" | "pass" | "warn" | "fail" }) {
-  return (
-    <div className="verification-summary-cell">
-      <span>{label}</span>
-      <strong className={tone === "normal" ? "" : "verification-" + tone}>{value}</strong>
-    </div>
-  );
-}
-
-function EnvironmentRow({ label, value }: { label: string; value: string }) {
-  return <div className="verification-env-row"><span>{label}</span><strong>{value}</strong></div>;
-}
-
-function KernelSection() {
-  return (
-    <section className="verification-section verification-gpu-section">
-      <div className="verification-section-heading">
-        <div>
-          <span>GPU kernel timings</span>
-          <small>GPU detected, but no kernel timing dataset was returned by the verification API.</small>
-        </div>
-      </div>
-      <div className="verification-kernel-table-wrap">
-        <table className="verification-table">
-          <thead><tr><th>Kernel</th><th>Iterations</th><th>Min</th><th>Median</th><th>P95</th><th>CPU speedup</th></tr></thead>
-          <tbody><tr><td>–</td><td>–</td><td>–</td><td>–</td><td>–</td><td>–</td></tr></tbody>
-        </table>
-      </div>
-      <div className="verification-chart" aria-label="GPU kernel timing chart unavailable">
-        <div className="verification-chart-axis"><span>timing</span><span>−</span></div>
-        <div className="verification-chart-empty">-</div>
-        <div className="verification-chart-axis"><span>iteration</span><span>−</span></div>
-      </div>
-    </section>
-  );
-}
-
 export function VerificationDashboard() {
-  const [snapshot, setSnapshot] = useState<VerificationSnapshot | null>(null);
-  const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [verification, runtimeResult] = await Promise.all([
-        getVerificationSnapshot(),
-        getRuntimeSnapshot().catch(() => null),
-      ]);
-      setSnapshot(verification);
-      setRuntime(runtimeResult);
-    } catch (e) {
-      setSnapshot(null);
-      setRuntime(null);
-      setError(e instanceof Error ? e.message : "Verification service unavailable.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  if (loading) {
-    return <section className="verification-page"><div className="verification-loading">Loading verification data...</div></section>;
-  }
-
-  if (error || !snapshot) {
-    return (
-      <section className="verification-page">
-        <header className="verification-topline">
-          <span>solver / verification / run -</span>
-          <button className="verification-rerun" onClick={() => void load()}>Re-run</button>
-        </header>
-        <div className="verification-title-row">
-          <div><h2>Verification</h2><span>backend: {runtime?.executionBackend ?? "-"}</span></div>
-        </div>
-        <div className="verification-note">Verification data is unavailable: {error ?? "-"}</div>
-      </section>
-    );
-  }
-
-  const s = snapshot.summary;
-  const backend = runtime?.executionBackend ?? "-";
-  const gpuReady = s.gpuRuntimeReady === true || runtime?.cudaDeviceReady === true;
-  const missingData = s.skipped > 0 || s.status === "degraded" || s.status === "unavailable" ||
-    snapshot.checks.some((check) => check.status === "skipped" || check.status === "unavailable") ||
-    [s.fallbackChecksPassed, s.regressionChecksPassed, s.ftranChecksPassed, s.btranChecksPassed, s.pricingChecksPassed, s.workspaceChecksPassed].some((v) => v === null);
-
-  return (
-    <section className="verification-page">
-      <header className="verification-topline">
-        <span>solver / verification / run -</span>
-        <div className="verification-run-meta">
-          <span>timestamp {formatTimestamp(s.lastVerifiedAt)}</span>
-          <span>duration -</span>
-          <span>git -</span>
-          <button className="verification-rerun" onClick={() => void load()}>Re-run</button>
-        </div>
-      </header>
-
-      <div className="verification-title-row">
-        <div>
-          <h2>Verification</h2>
-          <span>backend: {backend}</span>
-        </div>
-      </div>
-
-      <div className="verification-summary-strip">
-        <SummaryCell label="passed" value={String(s.passed)} tone={s.passed > 0 ? "pass" : "normal"} />
-        <SummaryCell label="failed" value={String(s.failed)} tone={s.failed > 0 ? "fail" : "normal"} />
-        <SummaryCell label="not run" value={String(s.skipped)} tone={s.skipped > 0 ? "warn" : "normal"} />
-        <SummaryCell label="max rel err" value="-" />
-        <SummaryCell label="gpu status" value={gpuReady ? "ready" : "-"} tone={gpuReady ? "pass" : "normal"} />
-      </div>
-
-      {missingData && (
-        <div className="verification-note">
-          Some verification fields or checks were not returned by the solver API; missing values are shown as -.
-        </div>
-      )}
-
-      <section className="verification-section">
-        <div className="verification-section-heading">
-          <div><span>Results</span><small>{snapshot.checks.length} check{snapshot.checks.length === 1 ? "" : "s"}</small></div>
-        </div>
-        <div className="verification-table-wrap">
-          <table className="verification-table">
-            <thead><tr><th>Status</th><th>Check</th><th>Area</th><th>Time</th><th>Rel err</th><th>Tolerance</th></tr></thead>
-            <tbody>
-              {snapshot.checks.length === 0
-                ? <tr><td className="verification-muted-text" colSpan={6}>-</td></tr>
-                : snapshot.checks.map((check) => <CheckRow key={check.id} check={check} />)}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="verification-section">
-        <div className="verification-section-heading"><div><span>Environment</span><small>Values returned by the solver API</small></div></div>
-        <div className="verification-env">
-          <EnvironmentRow label="solver version" value={runtime?.version ?? "-"} />
-          <EnvironmentRow label="precision" value="-" />
-          <EnvironmentRow label="seed" value="-" />
-          <EnvironmentRow label="reference impl" value="-" />
-          <EnvironmentRow label="OS" value="-" />
-          <EnvironmentRow label="python" value="-" />
-          <EnvironmentRow label="numpy" value="-" />
-          <EnvironmentRow label="cuda" value="-" />
-        </div>
-      </section>
-
-      {gpuReady && <KernelSection />}
-    </section>
-  );
+ const [snapshot,setSnapshot]=useState<VerificationSnapshot|null>(null);
+ const [error,setError]=useState<string|null>(null);
+ const [loading,setLoading]=useState(true);
+ const load=useCallback(async()=>{setLoading(true);setError(null);try{setSnapshot(await getVerificationSnapshot());}catch(e){setSnapshot(null);setError(e instanceof Error?e.message:"Verification service unavailable.");}finally{setLoading(false);}},[]);
+ useEffect(()=>{void load();},[load]);
+ if(loading)return <section className="dashboard"><article className="panel empty-state">Loading authoritative verification results…</article></section>;
+ if(error||!snapshot)return <section className="dashboard"><div className="hero"><div><span className="eyebrow">PHASE 6.10 · VERIFICATION</span><h2>Verification dashboard</h2><p>The C++ verification service is not currently reachable.</p></div><div className="hero-badge"><span className="status-dot muted"/> Unavailable</div></div><article className="panel unavailable-panel"><h3>Verification data unavailable</h3><p>{error??"No verification snapshot was returned."}</p><button className="secondary-button" onClick={()=>void load()}>Retry verification</button></article></section>;
+ const s=snapshot.summary; const percent=s.total>0?Math.round(s.passed/s.total*100):0;
+ return <section className="dashboard">
+  <div className="hero"><div><span className="eyebrow">PHASE 6.10 · VERIFICATION</span><h2>Verification dashboard</h2><p>Authoritative regression, numerical, backend, and workspace verification reported by the solver service.</p></div><div className="hero-badge"><span className="status-dot"/> {s.status.toUpperCase()}</div></div>
+  <div className="metric-grid">
+   <article className="metric-card"><span>Checks</span><strong>{s.passed} / {s.total}</strong><small>{percent}% passed</small></article>
+   <article className="metric-card"><span>Failed</span><strong>{s.failed}</strong><small>{s.skipped} skipped</small></article>
+   <article className="metric-card"><span>Numerical stability</span><strong>{s.numericalStable===null?"UNKNOWN":s.numericalStable?"STABLE":"FAILED"}</strong><small>Solver-reported validation</small></article>
+   <article className="metric-card"><span>GPU runtime</span><strong>{s.gpuRuntimeReady===null?"UNKNOWN":s.gpuRuntimeReady?"READY":"NOT READY"}</strong><small>Actual runtime capability</small></article>
+  </div>
+  <div className="content-grid">
+   <article className="panel"><div className="panel-heading"><div><span className="eyebrow">VALIDATION AREAS</span><h3>Subsystem coverage</h3></div></div>
+    <Coverage label="Certificates" value={s.certificatePassCount}/><Coverage label="Fallback" value={s.fallbackChecksPassed}/><Coverage label="Regression" value={s.regressionChecksPassed}/><Coverage label="FTRAN" value={s.ftranChecksPassed}/><Coverage label="BTRAN" value={s.btranChecksPassed}/><Coverage label="Pricing" value={s.pricingChecksPassed}/><Coverage label="Workspace" value={s.workspaceChecksPassed}/>
+   </article>
+   <article className="panel"><div className="panel-heading"><div><span className="eyebrow">RUN STATUS</span><h3>Verification state</h3></div><span className="badge">{s.status.toUpperCase()}</span></div>
+    <StatusLine label="Passed checks" value={String(s.passed)} ok={s.failed===0}/><StatusLine label="Failed checks" value={String(s.failed)} ok={s.failed===0}/><StatusLine label="Skipped checks" value={String(s.skipped)}/><StatusLine label="Last verified" value={s.lastVerifiedAt?new Date(s.lastVerifiedAt).toLocaleString():"Not reported"}/>{s.message&&<p className="model-message">{s.message}</p>}
+   </article>
+  </div>
+  <article className="panel activity"><div className="panel-heading"><div><span className="eyebrow">CHECK DETAILS</span><h3>Verification checks</h3></div><button className="secondary-button" onClick={()=>void load()}>Refresh</button></div><div className="verification-list">{snapshot.checks.map(check=><CheckRow key={check.id} check={check}/>)}</div></article>
+ </section>;
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import type { UploadedModel } from "../types/model";
 import type { SolverConfiguration } from "../types/solverConfig";
 import { getRuntimeSnapshot, getSolveResult, getSolveStatus, inspectModel, solveModel } from "../services/api";
-import type { SolveResult, SolveJob, SolveJobStatus } from "../types/solve";
+import type { SolveResult, SolveJob } from "../types/solve";
 import type { RuntimeSnapshot } from "../types/runtime";
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
   config: SolverConfiguration;
   onJobCreated?: (jobId: string) => void;
   onSolveComplete?: (jobId: string) => void;
+  onOpenResults?: () => void;
 }
 
 const initialJob: SolveJob = {

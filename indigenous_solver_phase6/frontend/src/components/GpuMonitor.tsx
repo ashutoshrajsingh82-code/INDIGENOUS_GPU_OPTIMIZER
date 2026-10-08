@@ -171,12 +171,44 @@ export function GpuMonitor() {
         <TelemetryChart title="CPU Fallbacks" subtitle="Authoritative fallback counter" values={chartData.fallback} history={history} />
       </div>
 
+      <div className="gpu-pie-grid">
+        <PieChart title="Solver operation mix" subtitle="Current FTRAN / BTRAN / Pricing distribution" values={[
+          { label: "FTRAN", value: data.ftranCalls },
+          { label: "BTRAN", value: data.btranCalls },
+          { label: "Pricing", value: data.pricingCalls },
+        ]} empty="No solver operations recorded yet." />
+        <PieChart title="Workspace mix" subtitle="Current allocation / reuse distribution" values={[
+          { label: "Allocations", value: data.workspaceAllocations },
+          { label: "Reuses", value: data.workspaceReuses },
+        ]} empty="No workspace activity recorded yet." />
+      </div>
+
       <div className="gpu-footer-state">
         <div><span className="eyebrow">TRUTHFUL GPU OBSERVABILITY</span><strong>{statusText}</strong><p>{data.message ?? (active ? "CUDA execution is active according to the native runtime." : "GPU hardware telemetry is unavailable on this machine. The page does not synthesize utilization, temperature, power, clocks, or memory values.")}</p></div>
         <div className="gpu-footer-actions"><span className="gpu-status-badge">{data.status.toUpperCase()}</span><span className="gpu-status-badge">{data.version ?? "Runtime version unknown"}</span><button onClick={() => void refresh()} disabled={refreshing}>{refreshing ? "Refreshing…" : "Refresh now"}</button></div>
       </div>
     </section>
   );
+}
+
+function PieChart({ title, subtitle, values, empty }: { title: string; subtitle: string; values: Array<{ label: string; value: number }>; empty: string }) {
+  const total = values.reduce((sum, item) => sum + Math.max(0, item.value), 0);
+  if (total <= 0) return <article className="gpu-panel gpu-pie-panel"><div className="gpu-chart-heading"><div><span>{title}</span><small>{subtitle}</small></div></div><div className="gpu-pie-empty">{empty}</div></article>;
+
+  let offset = 0;
+  const gradient = values.filter((item) => item.value > 0).map((item, index) => {
+    const start = offset;
+    offset += item.value / total * 100;
+    return `var(--pie-${(index % 8) + 1}) ${start}% ${offset}%`;
+  }).join(", ");
+
+  return <article className="gpu-panel gpu-pie-panel">
+    <div className="gpu-chart-heading"><div><span>{title}</span><small>{subtitle}</small></div><strong>{total.toLocaleString()}</strong></div>
+    <div className="gpu-pie-content">
+      <div className="gpu-pie" style={{ background: `conic-gradient(${gradient})` }}><div><strong>{total.toLocaleString()}</strong><small>TOTAL</small></div></div>
+      <div className="gpu-pie-legend">{values.map((item, index) => <div key={item.label}><i className={`pie-swatch swatch-${(index % 8) + 1}`} /><span>{item.label}</span><b>{(Math.max(0, item.value) / total * 100).toFixed(1)}%</b></div>)}</div>
+    </div>
+  </article>;
 }
 
 function toHistoryPoint(data: RuntimeSnapshot): HistoryPoint {

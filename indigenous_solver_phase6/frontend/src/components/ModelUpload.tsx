@@ -45,7 +45,8 @@ export function ModelUpload({ onModelReady }: Props) {
         },
       });
       setApiMessage("Authoritative model dimensions received from the solver API.");
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown solver API error.";
       onModelReady({
         file,
         summary: {
@@ -59,7 +60,7 @@ export function ModelUpload({ onModelReady }: Props) {
           message: "Browser validation passed; exact dimensions require the solver API.",
         },
       });
-      setApiMessage("Browser validation passed. Solver API unavailable; exact dimensions will be available when the API is connected.");
+      setApiMessage("Browser validation passed. Solver API request failed: " + message);
     } finally {
       setInspecting(false);
     }

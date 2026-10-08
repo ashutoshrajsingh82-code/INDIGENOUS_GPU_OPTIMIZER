@@ -185,9 +185,9 @@ export function LiveSolver({ model, config, onJobCreated, onSolveComplete, onOpe
         <article className="live-panel live-status-panel">
           <div className="live-section-title"><div><span>THROTTLE / EXECUTION REASONS</span><strong>Solver backend state</strong></div><b>{runtime?.gpuRuntimeActive ? "GPU ACTIVE" : "CPU MODE"}</b></div>
           <LiveStatusRow label="CPU Execution" value={runtime?.executionBackend === "CPU" ? "ACTIVE" : "STANDBY"} active={runtime?.executionBackend === "CPU"} />
-          <LiveStatusRow label="CUDA Compiled" value={runtime?.cudaCompiled ? "READY" : "NOT AVAILABLE"} active={runtime?.cudaCompiled} />
-          <LiveStatusRow label="CUDA Device" value={runtime?.cudaDeviceReady ? "READY" : "NOT AVAILABLE"} active={runtime?.cudaDeviceReady} />
-          <LiveStatusRow label="GPU Runtime" value={runtime?.gpuRuntimeActive ? "ACTIVE" : "INACTIVE"} active={runtime?.gpuRuntimeActive} />
+          <LiveStatusRow label="CUDA Compiled" value={runtime?.cudaCompiled ? "READY" : "NOT AVAILABLE"} active={runtime?.cudaCompiled ?? false} />
+          <LiveStatusRow label="CUDA Device" value={runtime?.cudaDeviceReady ? "READY" : "NOT AVAILABLE"} active={runtime?.cudaDeviceReady ?? false} />
+          <LiveStatusRow label="GPU Runtime" value={runtime?.gpuRuntimeActive ? "ACTIVE" : "INACTIVE"} active={runtime?.gpuRuntimeActive ?? false} />
           <LiveStatusRow label="CPU Fallback" value={runtime?.fallbackCount ? "USED" : (config.enableCpuFallback ? "ENABLED" : "DISABLED")} active={config.enableCpuFallback} />
           <LiveStatusRow label="Numerical Checks" value={runtime ? runtime.numericalChecks.toLocaleString() : "N/A"} active={Boolean(runtime?.numericalStable)} />
         </article>

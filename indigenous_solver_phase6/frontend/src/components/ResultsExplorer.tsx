@@ -108,3 +108,8 @@ function ResultsState({ title, message, danger = false }: { title: string; messa
 function formatNumber(value: number | null | undefined) {
   return value === null || value === undefined || !Number.isFinite(value) ? "—" : Number(value).toPrecision(10).replace(/\.0+$/, "");
 }
+
+function shortId(value: string | null | undefined) {
+  if (!value) return "—";
+  return value.length > 18 ? value.slice(0, 8) + "…" + value.slice(-6) : value;
+}

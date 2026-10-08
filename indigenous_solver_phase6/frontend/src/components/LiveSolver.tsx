@@ -238,7 +238,8 @@ function LiveStatusRow({ label, value, active }: { label: string; value: string;
 
 function TelemetryChart({ title, value, subtitle, mode, terminal }: { title: string; value: string; subtitle: string; mode: number; terminal: boolean }) {
   const height = 92;
-  const current = Math.max(8, Math.min(92, mode));\n  const points = Array.from({ length: 16 }, () => current);
+  const current = Math.max(8, Math.min(92, mode));
+  const points = Array.from({ length: 16 }, () => current);
   const polyline = points.map((p, i) => (i * 100 / (points.length - 1)).toFixed(1) + "," + (height - p)).join(" ");
   return <article className="live-panel live-chart-panel">
     <div className="live-chart-heading"><div><span>{title}</span><small>{subtitle}</small></div><strong>{value}</strong></div>

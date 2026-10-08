@@ -275,7 +275,7 @@ export function LiveSolver({ model, config, onJobCreated, onSolveComplete, onOpe
               <div className="live-table-scroll">
                 <table><thead><tr><th>CONSTRAINT</th><th>RESIDUAL</th><th>ABSOLUTE</th></tr></thead><tbody>
                   {result.constraints.slice(0, 20).map((item) => (
-                    <tr key={item.name}><td>{item.name}</td><td>{formatNumber(item.residual)}</td><td>{formatNumber(Math.abs(item.residual))}</td></tr>
+                    <tr key={item.name}><td>{item.name}</td><td>{formatNumber(item.residual)}</td><td>{item.residual == null ? "N/A" : formatNumber(Math.abs(item.residual))}</td></tr>
                   ))}
                 </tbody></table>
               </div>

@@ -27,6 +27,19 @@ export function ModelUpload({ onModelReady }: Props) {
     try {
       const remote = await inspectApiModel(analysis.file);
       setApiPassed(true);
+      const density = remote.rows > 0 && remote.columns > 0
+        ? ((remote.nonzeros / (remote.rows * remote.columns)) * 100).toFixed(6) + "%"
+        : null;
+      setAnalysis((current) => current ? {
+        ...current,
+        remoteStats: {
+          rows: remote.rows,
+          columns: remote.columns,
+          nonzeros: remote.nonzeros,
+          density,
+          source: "solver api",
+        },
+      } : current);
       onModelReady({ file: analysis.file, modelId: remote.modelId, summary: remote });
     } catch (error) {
       setApiError(error instanceof Error ? error.message : "Solver API inspection failed.");

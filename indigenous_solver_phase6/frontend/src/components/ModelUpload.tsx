@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { UploadedModel } from "../types/model";
-import { inspectModel as inspectLocalModel } from "../services/modelParser";
+import { analyzeModelFile } from "../services/modelParser";
 import { inspectModel as inspectApiModel } from "../services/api";
 
 interface Props { onModelReady: (model: UploadedModel | null) => void; }
@@ -15,10 +15,14 @@ export function ModelUpload({ onModelReady }: Props) {
   const acceptFiles = async (files: FileList | File[]) => {
     const file = files[0];
     if (!file) return;
-    const localSummary = inspectLocalModel(file);
-    setError(localSummary.status === "Rejected" ? localSummary.message : "");
+    setError("");
     setApiMessage("");
-    if (localSummary.status === "Rejected") {
+
+    const analysis = await analyzeModelFile(file);
+    const failedChecks = analysis.checks.filter((item) => item.status === "failed");
+    if (!analysis.canSend || failedChecks.length > 0) {
+      const reasons = failedChecks.map((item) => item.name + ": " + (item.reason ?? "validation failed"));
+      setError(reasons.join(" · ") || "Browser validation failed.");
       onModelReady(null);
       return;
     }
@@ -42,8 +46,20 @@ export function ModelUpload({ onModelReady }: Props) {
       });
       setApiMessage("Authoritative model dimensions received from the solver API.");
     } catch {
-      onModelReady({ file, summary: localSummary });
-      setApiMessage("Solver API unavailable. Local file validation passed; exact dimensions will be available when the API is connected.");
+      onModelReady({
+        file,
+        summary: {
+          name: file.name,
+          format: analysis.format,
+          sizeBytes: file.size,
+          rows: 0,
+          columns: 0,
+          nonzeros: 0,
+          status: "Ready",
+          message: "Browser validation passed; exact dimensions require the solver API.",
+        },
+      });
+      setApiMessage("Browser validation passed. Solver API unavailable; exact dimensions will be available when the API is connected.");
     } finally {
       setInspecting(false);
     }

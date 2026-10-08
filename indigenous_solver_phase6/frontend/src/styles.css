@@ -211,3 +211,48 @@
 .verification-gpu-section{margin-top:18px}.verification-kernel-table-wrap{border:1px solid #262c36}.verification-chart{height:170px;border:1px solid #262c36;border-top:0;position:relative;padding:18px 30px 24px;font:10px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#7d8590}.verification-chart:before{content:"";position:absolute;left:28px;top:17px;bottom:24px;border-left:1px solid #303741}.verification-chart:after{content:"";position:absolute;left:28px;right:20px;bottom:24px;border-bottom:1px solid #303741}.verification-chart-axis{display:flex;justify-content:space-between}.verification-chart-empty{height:105px;display:grid;place-items:center;color:#7d8590;font-size:12px}
 .verification-loading{font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#7d8590;padding:30px 0}.verification-page button{box-shadow:none}.verification-page .verification-table td:nth-child(2){font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 @media(max-width:800px){.verification-topline{height:auto;min-height:31px;align-items:flex-start;padding:7px 0;gap:8px}.verification-run-meta{gap:8px;flex-wrap:wrap;justify-content:flex-end}.verification-summary-strip{grid-template-columns:1fr 1fr}.verification-summary-cell:nth-child(2n){border-right:0}.verification-summary-cell:last-child{border-right:0;grid-column:1/-1}.verification-env{grid-template-columns:1fr}.verification-env-row{border-right:0!important}.verification-env-row:nth-last-child(-n+2){border-bottom:1px solid #262c36}.verification-env-row:last-child{border-bottom:0}.verification-page{padding:10px}}
+
+/* Phase 6.3 model workspace */
+.model-workspace{max-width:1180px;margin:0 auto;padding:8px 0 28px;color:#d0d7de;font-size:12px}
+.model-workspace,.model-workspace *{box-sizing:border-box}
+.model-workspace code,.model-workspace pre,.model-workspace .model-breadcrumb,.model-workspace .model-section-label,.model-workspace .model-data-row code,.model-workspace .model-check-row code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+.model-breadcrumb{min-height:31px;border-bottom:1px solid #262c36;display:flex;align-items:center;justify-content:space-between;gap:16px;color:#7d8590;font-size:11px}
+.model-title-row{padding:20px 0 14px}
+.model-title-row h2{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:22px;font-weight:600;color:#d0d7de}
+.model-title-row p{margin:6px 0 0;color:#7d8590;font-size:12px;line-height:1.5}
+.model-drop-strip{min-height:46px;border:1px dashed #3a424d;border-radius:5px;padding:9px 11px;display:flex;align-items:center;justify-content:space-between;gap:12px;color:#8b949e;outline:none}
+.model-drop-strip:hover,.model-drop-strip:focus-visible,.model-drop-strip.dragging{border-color:#7d8590;color:#d0d7de}
+.model-browse-button,.model-action-primary,.model-action-secondary{border:1px solid #3a424d;border-radius:4px;background:#0d1117;color:#d0d7de;font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:6px 10px;cursor:pointer}
+.model-browse-button:hover,.model-action-primary:hover,.model-action-secondary:hover{border-color:#7d8590}
+.model-info-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border:1px solid #262c36;border-radius:5px;margin-top:12px}
+.model-info-block{padding:11px 13px}
+.model-info-block+ .model-info-block{border-left:1px solid #262c36}
+.model-section-label{font-size:10px;letter-spacing:.08em;color:#7d8590;margin-bottom:8px}
+.model-data-row{display:grid;grid-template-columns:140px minmax(0,1fr);gap:14px;align-items:center;min-height:29px;border-top:1px solid #20262e}
+.model-data-row span{color:#7d8590}
+.model-data-row code{color:#d0d7de;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.model-data-row code[title]{cursor:help}
+.hash-copy{border:0;background:none;color:#7d8590;font:10px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:0 0 0 7px;cursor:pointer}
+.hash-copy:hover{color:#d0d7de}
+.model-source{padding-top:8px;color:#7d8590;font:10px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.model-section-block{border:1px solid #262c36;border-radius:5px;margin-top:12px;overflow:hidden}
+.model-section-block>.model-section-label{padding:10px 13px 8px;margin:0;border-bottom:1px solid #262c36}
+.model-check-table{width:100%}
+.model-check-row{display:grid;grid-template-columns:24px minmax(0,1fr) 90px;gap:8px;align-items:center;min-height:35px;padding:6px 13px;border-top:1px solid #20262e}
+.model-check-row:first-child{border-top:0}
+.model-check-icon{font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.model-check-icon.passed{color:#3fb950}.model-check-icon.failed{color:#f85149}.model-check-icon.pending{color:#d29922}
+.model-check-text strong{display:block;font:12px system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-weight:400;color:#d0d7de}
+.model-check-text small{display:block;margin-top:2px;color:#f85149;font:10px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.model-check-row>code{text-align:right;color:#7d8590;font-size:10px}
+.model-section-heading{display:flex;align-items:center;justify-content:space-between;padding:10px 13px 8px;border-bottom:1px solid #262c36}
+.model-section-heading .model-section-label{margin:0}
+.model-section-heading code{color:#7d8590;font-size:10px}
+.model-preview{margin:0;padding:10px 13px;min-height:140px;max-height:310px;overflow:auto;background:#0b0f14;color:#c9d1d9;font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre}
+.model-preview b{display:inline-block;width:42px;color:#484f58;font-weight:400;user-select:none}
+.model-actions{display:flex;gap:8px;margin-top:12px}
+.model-action-primary{color:#d0d7de;background:#11161d}
+.model-action-primary:disabled{color:#484f58;border-color:#262c36;cursor:not-allowed}
+.model-action-secondary{color:#7d8590}
+.model-empty-state{margin-top:12px;border:1px solid #262c36;border-radius:5px;min-height:88px;display:flex;align-items:center;padding:13px;color:#7d8590;font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media(max-width:760px){.model-info-grid{grid-template-columns:1fr}.model-info-block+.model-info-block{border-left:0;border-top:1px solid #262c36}.model-breadcrumb{align-items:flex-start;padding:8px 0}.model-data-row{grid-template-columns:115px minmax(0,1fr)}.model-check-row{grid-template-columns:22px minmax(0,1fr);}.model-check-row>code{grid-column:2;text-align:left}.model-workspace{padding:6px 0 20px}}

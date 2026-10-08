@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { UploadedModel } from "../types/model";
 import type { SolverConfiguration } from "../types/solverConfig";
-import { getSolveStatus, solveModel } from "../services/api";
+import { getSolveStatus, inspectModel, solveModel } from "../services/api";
 import type { SolveJob, SolveJobStatus } from "../types/solve";
 
 interface Props { model: UploadedModel | null; config: SolverConfiguration; onJobCreated?: (jobId: string) => void; onSolveComplete?: (jobId: string) => void; }
@@ -43,11 +43,16 @@ export function LiveSolver({ model, config, onJobCreated, onSolveComplete }: Pro
   };
 
   const start = async () => {
-    if (!model?.modelId) { setError("The solver API did not return a model ID. Re-inspect the model before solving."); return; }
+    if (!model) { setError("Select a valid LP or MPS model before solving."); return; }
     setError(""); setProgress(0); setIteration(null); setObjective(null); setElapsed(null);
-    setJob({ jobId: null, modelId: null, status: "submitting", message: "Submitting model to solver API…", startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), configuration: config });
+    setJob({ jobId: null, modelId: null, status: "submitting", message: "Registering model with solver API…", startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), configuration: config });
     try {
-      const response = await solveModel({ modelId: model.modelId ?? "", configuration: config });
+      // The native API keeps inspected models in process memory. Re-inspect immediately
+      // before solving so a model selected before an API restart never has a stale/missing ID.
+      const inspected = await inspectModel(model.file);
+      if (!inspected.modelId) throw new Error("Solver API did not return a model ID during model inspection.");
+      setJob((current) => ({ ...current, modelId: inspected.modelId, message: "Submitting model to solver API…", updatedAt: new Date().toISOString() }));
+      const response = await solveModel({ modelId: inspected.modelId, configuration: config });
       setJob({ jobId: response.jobId, modelId: response.modelId ?? null, status: response.status, message: response.message, startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), configuration: config });
       onJobCreated?.(response.jobId);
       if (response.status === "queued" || response.status === "running") { poll(response.jobId); } else { onSolveComplete?.(response.jobId); }

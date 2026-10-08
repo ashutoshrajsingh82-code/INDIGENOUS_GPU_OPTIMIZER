@@ -223,24 +223,76 @@ bool read_mps(const std::string& path, LinearModel& m, std::string& e) {
         rhs[tok[k]] = v;
       }
     } else if (sec == BOUNDS) {
+      // Standard MPS BOUNDS supports:
+      //   LO lower bound, UP upper bound, FX fixed value,
+      //   FR free, MI minus infinity, PL plus infinity,
+      //   BV binary, LI integer lower bound, UI integer upper bound.
+      //
+      // Both free-field and classic fixed-field records are accepted.
+      // Fixed-field positions are:
+      //   type 2-3, set 5-12, variable 15-22, value 25-36.
       std::string typ, set, var;
       Real val = 0;
       std::istringstream s(line);
       s >> typ >> set >> var;
 
-      if (!s) {
-        e = "MPS BOUNDS parse error at line " + std::to_string(ln);
+      if (!s || typ.empty() || set.empty() || var.empty()) {
+        // Recover the three identifying fields from fixed-field columns.
+        if (line.size() >= 22) {
+          typ = line.substr(1, 2);
+          set = line.substr(4, 8);
+          var = line.substr(14, 8);
+
+          auto trim = [](std::string value) {
+            const auto first = value.find_first_not_of(" \t\r");
+            if (first == std::string::npos) return std::string{};
+            const auto last = value.find_last_not_of(" \t\r");
+            return value.substr(first, last - first + 1);
+          };
+
+          typ = trim(typ);
+          set = trim(set);
+          var = trim(var);
+        }
+      }
+
+      if (typ.empty() || set.empty() || var.empty()) {
+        e = "MPS BOUNDS parse error at line " + std::to_string(ln) +
+            ": " + line;
         return false;
       }
 
-      if (typ != "LO" && typ != "UP" && typ != "FX" && typ != "FR") {
-        e = "unsupported BOUNDS type " + typ;
+      if (typ != "LO" && typ != "UP" && typ != "FX" && typ != "FR" &&
+          typ != "MI" && typ != "PL" && typ != "BV" && typ != "LI" &&
+          typ != "UI") {
+        e = "unsupported BOUNDS type " + typ +
+            " at line " + std::to_string(ln);
         return false;
       }
 
-      if (typ != "FR" && !(s >> val)) {
-        e = "missing bound value at line " + std::to_string(ln);
-        return false;
+      // FR, MI, PL and BV do not require a numeric value.
+      // LI/UI/LO/UP/FX require one.
+      const bool value_optional =
+          typ == "FR" || typ == "MI" || typ == "PL" || typ == "BV";
+
+      if (!value_optional) {
+        if (!(s >> val)) {
+          // Recover the numeric value from the canonical fixed-field
+          // location when whitespace parsing did not expose it.
+          bool recovered = false;
+          if (line.size() >= 36) {
+            std::istringstream fs(line.substr(24, 12));
+            if (fs >> val) {
+              recovered = true;
+            }
+          }
+
+          if (!recovered) {
+            e = "missing bound value at line " + std::to_string(ln) +
+                ": " + line;
+            return false;
+          }
+        }
       }
 
       if (!vi.count(var)) {
@@ -248,18 +300,28 @@ bool read_mps(const std::string& path, LinearModel& m, std::string& e) {
         vars.push_back(var);
       }
 
-      if (typ == "LO") {
+      if (typ == "LO" || typ == "LI") {
         lo[var] = val;
         haslo[var] = true;
-      } else if (typ == "UP") {
+      } else if (typ == "UP" || typ == "UI") {
         up[var] = val;
         hasup[var] = true;
       } else if (typ == "FX") {
         lo[var] = up[var] = val;
         haslo[var] = hasup[var] = true;
-      } else {
+      } else if (typ == "FR") {
         lo[var] = -kInfinity;
         up[var] = kInfinity;
+        haslo[var] = hasup[var] = true;
+      } else if (typ == "MI") {
+        lo[var] = -kInfinity;
+        haslo[var] = true;
+      } else if (typ == "PL") {
+        up[var] = kInfinity;
+        hasup[var] = true;
+      } else if (typ == "BV") {
+        lo[var] = 0;
+        up[var] = 1;
         haslo[var] = hasup[var] = true;
       }
     }

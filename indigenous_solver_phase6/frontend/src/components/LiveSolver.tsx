@@ -136,7 +136,7 @@ export function LiveSolver({ model, config, onJobCreated, onSolveComplete, onOpe
           {result ? (
             <>
               <button className="live-action secondary" onClick={onOpenResults}>FULL RESULTS ↗</button>
-              <button className="live-action solve-again" onClick={start} disabled={!canStart}>SOLVE AGAIN</button>
+              <button className="live-action solve-again" onClick={start} disabled={!canStart}>↻ SOLVE AGAIN</button>
             </>
           ) : (
             <button className="live-action solve-now" onClick={start} disabled={!canStart}>

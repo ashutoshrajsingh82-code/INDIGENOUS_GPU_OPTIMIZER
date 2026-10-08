@@ -2,7 +2,9 @@
 #include <ws2tcpip.h>
 #include <windows.h>
 
+#include <algorithm>
 #include <atomic>
+#include <cstdio>
 #include <cctype>
 #include <cmath>
 #include <iostream>
@@ -83,6 +85,9 @@ std::string jn(double v) {
 
 std::string ju(std::size_t v) { return std::to_string(v); }
 
+// Forward declaration used by benchmark/report JSON builders below.
+std::string now_utc_iso();
+
 std::string status_string(solver::SolveStatus s) {
   switch (s) {
     case solver::SolveStatus::Optimal: return "optimal";
@@ -138,6 +143,404 @@ std::string extension_format(const std::string& path) {
 
 std::string make_id(const char* prefix) {
   return std::string(prefix) + "-" + std::to_string(g_sequence.fetch_add(1));
+}
+
+
+struct BenchmarkCliResult {
+  bool available = false;
+  int exit_code = -1;
+  std::string output;
+};
+
+BenchmarkCliResult run_benchmark_cli(const fs::path& executable,
+                                     const fs::path& model_path) {
+  BenchmarkCliResult result;
+
+  if (!fs::exists(executable) || !fs::exists(model_path)) {
+    return result;
+  }
+
+  const std::string command =
+      "\"" + executable.string() + "\" solve \"" +
+      model_path.string() + "\" 2>&1";
+
+  FILE* pipe = _popen(command.c_str(), "r");
+  if (!pipe) {
+    return result;
+  }
+
+  char buffer[4096];
+  while (std::fgets(buffer, sizeof(buffer), pipe)) {
+    result.output += buffer;
+  }
+
+  result.exit_code = _pclose(pipe);
+  result.available = (result.exit_code == 0);
+  return result;
+}
+
+std::optional<std::string> benchmark_metric(
+    const std::string& text,
+    const std::string& key) {
+  const std::string needle = key + ":";
+  const auto pos = text.find(needle);
+  if (pos == std::string::npos) {
+    return std::nullopt;
+  }
+
+  const auto start = pos + needle.size();
+  auto end = text.find('\n', start);
+  if (end == std::string::npos) {
+    end = text.size();
+  }
+
+  auto value = text.substr(start, end - start);
+  while (!value.empty() &&
+         (value.back() == '\r' || value.back() == ' ' ||
+          value.back() == '\t')) {
+    value.pop_back();
+  }
+
+  const auto first = value.find_first_not_of(" \t");
+  if (first == std::string::npos) {
+    return std::nullopt;
+  }
+
+  return value.substr(first);
+}
+
+std::optional<double> benchmark_double(
+    const std::string& text,
+    const std::string& key) {
+  const auto value = benchmark_metric(text, key);
+  if (!value) {
+    return std::nullopt;
+  }
+
+  try {
+    return std::stod(*value);
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+
+std::optional<int> benchmark_int(
+    const std::string& text,
+    const std::string& key) {
+  const auto value = benchmark_metric(text, key);
+  if (!value) {
+    return std::nullopt;
+  }
+
+  try {
+    return std::stoi(*value);
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+
+std::string benchmark_status(const std::string& text) {
+  const auto value = benchmark_metric(text, "Status");
+  if (!value) {
+    return "error";
+  }
+
+  std::string status = *value;
+  std::transform(status.begin(), status.end(), status.begin(),
+                 [](unsigned char c) {
+                   return static_cast<char>(std::tolower(c));
+                 });
+
+  if (status.find("optimal") != std::string::npos) return "optimal";
+  if (status.find("infeasible") != std::string::npos) return "infeasible";
+  if (status.find("unbounded") != std::string::npos) return "unbounded";
+  if (status.find("iteration") != std::string::npos) return "iteration_limit";
+  return "error";
+}
+
+std::string benchmark_backend(const std::string& text) {
+  const auto value = benchmark_metric(text, "Pricing backend");
+  if (!value) {
+    return "UNKNOWN";
+  }
+
+  if (value->find("CUDA") != std::string::npos ||
+      value->find("GPU") != std::string::npos) {
+    return "CUDA";
+  }
+
+  if (value->find("CPU") != std::string::npos) {
+    return "CPU";
+  }
+
+  return "UNKNOWN";
+}
+
+std::string benchmark_case_json(
+    const std::string& model,
+    const std::optional<double>& phase2_ms,
+    const std::optional<double>& phase3_ms,
+    const std::optional<double>& phase4_ms,
+    const std::string& backend,
+    const std::string& status,
+    bool certificate_passed,
+    const std::optional<int>& iterations,
+    const std::optional<double>& objective,
+    const std::string& message) {
+  std::ostringstream out;
+  out << "{";
+  out << "\"model\":" << js(model);
+  out << ",\"phase2Ms\":" << (phase2_ms ? jn(*phase2_ms) : "null");
+  out << ",\"phase3Ms\":" << (phase3_ms ? jn(*phase3_ms) : "null");
+  out << ",\"phase4Ms\":" << (phase4_ms ? jn(*phase4_ms) : "null");
+
+  if (phase2_ms && phase3_ms && *phase3_ms > 0.0) {
+    out << ",\"speedup\":" << jn(*phase2_ms / *phase3_ms);
+  } else {
+    out << ",\"speedup\":null";
+  }
+
+  out << ",\"backend\":" << js(backend);
+  out << ",\"status\":" << js(status);
+  out << ",\"certificatePassed\":" << jb(certificate_passed);
+  out << ",\"iterations\":"
+      << (iterations ? std::to_string(*iterations) : "null");
+  out << ",\"objective\":"
+      << (objective ? jn(*objective) : "null");
+  out << ",\"message\":" << js(message);
+  out << "}";
+  return out.str();
+}
+
+std::string benchmark_snapshot_json() {
+  /*
+   * The benchmark endpoint executes the same Phase 2 and Phase 3
+   * solver CLIs used by the existing benchmark scripts.
+   *
+   * Phase 4 is intentionally null: Phase 4's benchmark status is a
+   * validated basis backend, not a full revised-simplex replacement.
+   * No synthetic Phase 4 timing is generated.
+   */
+  // Resolve the benchmark data root independently of the process working directory.
+  // The current repository has Phase 6 at the outer root while Phase 2 and
+  // the Netlib models are stored in the nested INDIGENOUS_GPU_OPTIMIZER tree.
+  fs::path outer_root = fs::current_path();
+
+  for (int depth = 0; depth < 8; ++depth) {
+    const fs::path nested_repo =
+        outer_root / "INDIGENOUS_GPU_OPTIMIZER";
+
+    if (fs::exists(outer_root / "benchmarks" / "netlib") ||
+        fs::exists(nested_repo / "benchmarks" / "netlib")) {
+      break;
+    }
+
+    const fs::path parent = outer_root.parent_path();
+    if (parent == outer_root) {
+      break;
+    }
+
+    outer_root = parent;
+  }
+
+  fs::path data_root = outer_root;
+
+  if (!fs::exists(data_root / "benchmarks" / "netlib")) {
+    const fs::path nested_repo =
+        outer_root / "INDIGENOUS_GPU_OPTIMIZER";
+
+    if (fs::exists(nested_repo / "benchmarks" / "netlib")) {
+      data_root = nested_repo;
+    }
+  }
+
+  const fs::path models_path =
+      data_root / "benchmarks" / "netlib";
+
+  const fs::path phase2_exe =
+      data_root / "indigenous_solver_phase2" /
+      "build" / "Release" /
+      "solver_phase2_cli.exe";
+
+  fs::path phase3_exe =
+      data_root / "indigenous_solver_phase3" /
+      "build" / "Release" /
+      "solver_phase3_cli.exe";
+
+  // In the current Phase 6 build tree, Phase 3 is embedded under Phase 5.
+  if (!fs::exists(phase3_exe)) {
+    phase3_exe =
+        outer_root / "indigenous_solver_phase6" /
+        "build" / "phase5_build" /
+        "phase3_build" / "Release" /
+        "solver_phase3_cli.exe";
+  }
+
+  const std::vector<std::string> models = {
+      "afiro", "adlittle", "blend", "bore3d", "brandy",
+      "grow15", "kb2", "lotfi", "sc50b", "share1b"};
+
+  std::ostringstream cases;
+  std::size_t model_count = 0;
+  std::size_t phase3_faster = 0;
+  std::size_t phase4_faster = 0;
+  std::size_t certificate_pass = 0;
+  std::size_t cpu_runs = 0;
+  std::size_t gpu_runs = 0;
+  double phase2_total = 0.0;
+  double phase3_total = 0.0;
+  bool any_case = false;
+  bool all_case_data_valid = true;
+
+  for (const auto& model_name : models) {
+    const fs::path model_path =
+        models_path / (model_name + ".mps");
+
+    const auto p2 =
+        run_benchmark_cli(phase2_exe, model_path);
+
+    const auto p3 =
+        run_benchmark_cli(phase3_exe, model_path);
+
+    const auto p2_ms =
+        benchmark_double(p2.output, "Timing total_ms");
+    const auto p3_ms =
+        benchmark_double(p3.output, "Timing total_ms");
+
+    const auto p3_backend =
+        benchmark_backend(p3.output);
+
+    const auto p3_status =
+        benchmark_status(p3.output);
+
+    const auto p3_certificate =
+        benchmark_metric(p3.output, "Certificate");
+
+    const auto p3_iterations =
+        benchmark_int(p3.output, "Iterations");
+
+    const auto p3_objective =
+        benchmark_double(p3.output, "Objective");
+
+    if (!p2.available || !p3.available ||
+        !p2_ms || !p3_ms) {
+      all_case_data_valid = false;
+    }
+
+    if (p2_ms) phase2_total += *p2_ms;
+    if (p3_ms) phase3_total += *p3_ms;
+
+    if (p2_ms && p3_ms) {
+      if (*p3_ms < *p2_ms) {
+        ++phase3_faster;
+      }
+    }
+
+    const bool cert =
+        p3_certificate &&
+        *p3_certificate == "PASS";
+
+    if (cert) {
+      ++certificate_pass;
+    }
+
+    if (p3_backend == "CUDA") {
+      ++gpu_runs;
+    } else if (p3_backend == "CPU") {
+      ++cpu_runs;
+    }
+
+    if (model_count > 0) {
+      cases << ",";
+    }
+
+    const std::string message =
+        !p3.available
+            ? "Phase 3 benchmark executable or model is unavailable."
+            : (!p3_ms
+                   ? "Phase 3 timing was not present in solver output."
+                   : "Measured from the Phase 3 solver CLI.");
+
+    cases << benchmark_case_json(
+        model_name,
+        p2_ms,
+        p3_ms,
+        std::nullopt,
+        p3_backend,
+        p3_status,
+        cert,
+        p3_iterations,
+        p3_objective,
+        message);
+
+    ++model_count;
+    any_case = true;
+  }
+
+  std::ostringstream out;
+
+  if (!any_case ||
+      !fs::exists(phase2_exe) ||
+      !fs::exists(phase3_exe) ||
+      !fs::exists(models_path)) {
+    out << "{"
+        << "\"summary\":{"
+        << "\"status\":\"unavailable\","
+        << "\"modelCount\":0,"
+        << "\"phase2TotalMs\":null,"
+        << "\"phase3TotalMs\":null,"
+        << "\"phase4TotalMs\":null,"
+        << "\"aggregateSpeedup\":null,"
+        << "\"phase3FasterCount\":0,"
+        << "\"phase4FasterCount\":0,"
+        << "\"certificatePassCount\":0,"
+        << "\"gpuRuns\":0,"
+        << "\"cpuRuns\":0,"
+        << "\"timestamp\":" << js(now_utc_iso()) << ","
+        << "\"message\":"
+        << js("Benchmark executables or Netlib models are not available. "
+              "Build Phase 2 and Phase 3 and keep benchmarks/netlib "
+              "available to expose benchmark data.")
+        << "},"
+        << "\"cases\":[]}";
+    return out.str();
+  }
+
+  const double aggregate =
+      phase3_total > 0.0
+          ? phase2_total / phase3_total
+          : 0.0;
+
+  std::string message =
+      "Measured from the Phase 2 and Phase 3 solver CLIs on the "
+      "local Netlib benchmark set. Phase 4 timing is unavailable "
+      "because Phase 4 is a validated basis backend rather than "
+      "a full revised-simplex replacement.";
+
+  if (!all_case_data_valid) {
+    message +=
+        " One or more benchmark cases did not return complete timing data.";
+  }
+
+  out << "{"
+      << "\"summary\":{"
+      << "\"status\":\"ok\","
+      << "\"modelCount\":" << model_count << ","
+      << "\"phase2TotalMs\":" << jn(phase2_total) << ","
+      << "\"phase3TotalMs\":" << jn(phase3_total) << ","
+      << "\"phase4TotalMs\":null,"
+      << "\"aggregateSpeedup\":" << jn(aggregate) << ","
+      << "\"phase3FasterCount\":" << phase3_faster << ","
+      << "\"phase4FasterCount\":" << phase4_faster << ","
+      << "\"certificatePassCount\":" << certificate_pass << ","
+      << "\"gpuRuns\":" << gpu_runs << ","
+      << "\"cpuRuns\":" << cpu_runs << ","
+      << "\"timestamp\":" << js(now_utc_iso()) << ","
+      << "\"message\":" << js(message)
+      << "},"
+      << "\"cases\":[" << cases.str() << "]}";
+
+  return out.str();
 }
 
 std::string report_runtime(const ProductionSolver::Report& r) {
@@ -226,7 +629,7 @@ std::string report_json(const Job& job) {
   out << "{"
       << "\"status\":\"ok\",\"report\":{"
       << "\"reportId\":" << js("report-" + job.id)
-      << ",\"generatedAt\":" << js("2026-10-08T00:00:00Z")
+      << ",\"generatedAt\":" << js(now_utc_iso())
       << ",\"jobId\":" << js(job.id)
       << ",\"model\":{\"name\":" << js(job.model.name)
       << ",\"modelId\":" << js(job.model_id)
@@ -399,7 +802,7 @@ void handle(SOCKET s) {
           send_response(s,200,"{\"status\":"+js(st)+",\"summary\":{\"status\":"+js(st)+",\"passed\":"+std::string(j.certificate.valid?"1":"0")+",\"total\":1,\"failed\":"+std::string(j.certificate.valid?"0":"1")+",\"skipped\":0,\"numericalStable\":"+jb(j.report.pipeline_numerical_failures==0)+",\"certificatePassCount\":"+std::string(j.certificate.valid?"1":"0")+",\"fallbackChecksPassed\":null,\"regressionChecksPassed\":null,\"ftranChecksPassed\":null,\"btranChecksPassed\":null,\"pricingChecksPassed\":null,\"workspaceChecksPassed\":null,\"gpuRuntimeReady\":false},\"checks\":[]}");
         }
       } else if(req.target=="/benchmarks") {
-        send_response(s,200,R"({"summary":{"status":"unavailable","modelCount":0,"phase2TotalMs":null,"phase3TotalMs":null,"phase4TotalMs":null,"aggregateSpeedup":null,"phase3FasterCount":0,"phase4FasterCount":0,"certificatePassCount":0,"gpuRuns":0,"cpuRuns":0,"message":"Benchmark service is not exposed by the Phase 6 native API yet."},"cases":[]})");
+        send_response(s,200,benchmark_snapshot_json());
       } else if(req.target=="/reports/latest") {
         std::lock_guard<std::mutex> lock(g_mutex);
         if(g_jobs.empty()) send_response(s,200,R"({"status":"unavailable","report":null,"message":"No completed solve is available for reporting."})");

@@ -28,6 +28,7 @@ export function ModelUpload({ onModelReady }: Props) {
       const remote = await inspectApiModel(file);
       onModelReady({
         file,
+        modelId: remote.modelId,
         summary: {
           name: remote.name,
           format: remote.format,

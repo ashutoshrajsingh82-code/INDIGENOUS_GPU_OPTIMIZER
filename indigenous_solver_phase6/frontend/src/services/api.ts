@@ -6,7 +6,7 @@ import type { ReportResponse } from "../types/report";
 
 export interface ApiConfig { baseUrl: string; timeoutMs: number; }
 export const apiConfig: ApiConfig = {
-  baseUrl: import.meta.env.VITE_SOLVER_API_URL ?? "http://127.0.0.1:8080",
+  baseUrl: import.meta.env.VITE_SOLVER_API_URL ?? "http://127.0.0.1:8090",
   timeoutMs: 15000,
 };
 
@@ -76,7 +76,7 @@ export function solveModel(requestBody: SolveRequest): Promise<SolveResponse> {
   return request<SolveResponse>("/solve", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(requestBody),
+    body: JSON.stringify({ modelId: requestBody.modelId, maxIterations: requestBody.configuration.maxIterations, backendPolicy: requestBody.configuration.backendPolicy, enableCpuFallback: requestBody.configuration.enableCpuFallback, enableNumericalValidation: requestBody.configuration.enableNumericalValidation, enableProfiling: requestBody.configuration.enableProfiling }),
   });
 }
 

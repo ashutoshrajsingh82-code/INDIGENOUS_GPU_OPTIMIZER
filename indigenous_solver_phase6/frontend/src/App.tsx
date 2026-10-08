@@ -77,7 +77,7 @@ function Dashboard({ onNavigate }: { onNavigate: (id: SolverNavigationItem["id"]
 
   const execution = runtime?.executionBackend ?? "UNKNOWN";
   const cudaReady = runtime?.cudaDeviceReady ?? false;
-  const productionReady = runtime?.status === "ready" || runtime?.status === "ok" || runtime?.numericalStable !== false;
+  const productionReady = Boolean(runtime && runtime.status !== "unavailable" && runtime.numericalStable !== false);
   const gpuActive = runtime?.gpuRuntimeActive ?? false;
   const totalCalls = (runtime?.pricingCalls ?? 0) + (runtime?.ftranCalls ?? 0) + (runtime?.btranCalls ?? 0);
 

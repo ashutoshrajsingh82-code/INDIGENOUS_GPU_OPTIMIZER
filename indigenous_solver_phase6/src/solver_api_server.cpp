@@ -3,6 +3,9 @@
 #include <windows.h>
 
 #include <atomic>
+#include <cctype>
+#include <cmath>
+#include <iostream>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -169,6 +172,20 @@ std::string result_json(const Job& job) {
   return out.str();
 }
 
+std::string now_utc_iso() {
+  const auto now = std::chrono::system_clock::now();
+  const auto tt = std::chrono::system_clock::to_time_t(now);
+  std::tm tm{};
+#ifdef _WIN32
+  gmtime_s(&tm, &tt);
+#else
+  gmtime_r(&tt, &tm);
+#endif
+  std::ostringstream out;
+  out << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
+  return out.str();
+}
+
 std::string report_json(const Job& job) {
   std::ostringstream out;
   out << "{"
@@ -193,7 +210,7 @@ std::string report_json(const Job& job) {
       << ",\"certificatePassCount\":" << (job.certificate.valid ? "1" : "0")
       << ",\"fallbackChecksPassed\":null,\"regressionChecksPassed\":null,\"ftranChecksPassed\":null"
       << ",\"btranChecksPassed\":null,\"pricingChecksPassed\":null,\"workspaceChecksPassed\":null"
-      << ",\"gpuRuntimeReady\":false,\"lastVerifiedAt\":" << js("2026-10-08T00:00:00Z") << "},"
+      << ",\"gpuRuntimeReady\":false,\"lastVerifiedAt\":" << js(now_utc_iso()) << "},"
       << "\"checks\":[{\"id\":\"solution-certificate\",\"category\":\"numerical\",\"name\":\"Solution certificate\","
       << "\"status\":" << js(job.certificate.valid ? "passed" : "failed")
       << ",\"severity\":" << js(job.certificate.valid ? "info" : "error")
@@ -266,6 +283,7 @@ std::string multipart_model(const Request& req, std::string& filename, std::stri
   if(fp==std::string::npos){error="multipart filename missing";return{};}
   const auto fe=req.body.find('"',fp+10);
   filename=req.body.substr(fp+10,fe-(fp+10));
+  filename=fs::path(filename).filename().string();
   const auto hs=req.body.find("\r\n\r\n",fe);
   if(hs==std::string::npos){error="multipart header missing";return{};}
   const auto start=hs+4;

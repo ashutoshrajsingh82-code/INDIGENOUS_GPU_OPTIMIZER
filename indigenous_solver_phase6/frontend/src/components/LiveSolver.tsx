@@ -133,16 +133,20 @@ export function LiveSolver({ model, config, onJobCreated, onSolveComplete, onOpe
         <div className="live-toolbar-actions">
           <span className={terminal ? "live-state complete" : "live-state"}><span className="status-dot" /> {terminal ? "SOLVE COMPLETE" : statusLabel}</span>
           <span className="live-refresh">1s telemetry</span>
-          {result ? (
-            <>
-              <button className="live-action secondary" onClick={onOpenResults}>FULL RESULTS ↗</button>
-              <button className="live-action solve-again" onClick={start} disabled={!canStart}>↻ SOLVE AGAIN</button>
-            </>
-          ) : (
-            <button className="live-action solve-now" onClick={start} disabled={!canStart}>
-              {["submitting", "queued", "running"].includes(job.status) ? "SOLVING…" : "SOLVE"}
-            </button>
+          {result && (
+            <button className="live-action secondary" onClick={onOpenResults}>FULL RESULTS ↗</button>
           )}
+          <button
+            className={result ? "live-action solve-again" : "live-action solve-now"}
+            onClick={start}
+            disabled={!canStart}
+          >
+            {["submitting", "queued", "running"].includes(job.status)
+              ? "SOLVING…"
+              : result
+                ? "↻ SOLVE AGAIN"
+                : "SOLVE"}
+          </button>
         </div>
       </div>
 

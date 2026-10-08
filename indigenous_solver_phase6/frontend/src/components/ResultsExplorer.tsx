@@ -66,7 +66,9 @@ export function ResultsExplorer({ jobId }: Props) {
 
     <div className="results-grid results-charts-grid">
       <Panel className="chart-panel"><PanelTitle title="Solution variable profile" /><BarProfile values={result.variables.slice(0, 12).map((v) => ({ label: v.name, value: v.value }))} empty="No variable values returned." /></Panel>
+      <Panel className="chart-panel"><PanelTitle title="Solution magnitude mix" /><PieChart values={result.variables.filter((v) => Number.isFinite(v.value) && Math.abs(v.value) > 0).map((v) => ({ label: v.name, value: Math.abs(v.value) }))} empty="No non-zero variable magnitudes returned." /></Panel>
       <Panel className="chart-panel"><PanelTitle title="Constraint residual profile" /><BarProfile values={result.constraints.slice(0, 12).map((c) => ({ label: c.name, value: c.residual ?? Math.abs(c.activity - c.rhs) }))} empty="No constraint residuals returned." /></Panel>
+      <Panel className="chart-panel"><PanelTitle title="Residual magnitude mix" /><PieChart values={result.constraints.filter((c) => Number.isFinite(c.residual ?? (c.activity - c.rhs)) && Math.abs(c.residual ?? (c.activity - c.rhs)) > 0).map((c) => ({ label: c.name, value: Math.abs(c.residual ?? (c.activity - c.rhs)) }))} empty="No non-zero residual magnitudes returned." /></Panel>
       <Panel className="chart-panel chart-note"><PanelTitle title="Runtime telemetry" /><div className="telemetry-empty"><span>⌁</span><strong>Telemetry not captured</strong><p>The result API exposes final solver measurements, not a historical time series. No synthetic GPU/CPU graph is generated.</p></div></Panel>
     </div>
 
@@ -99,6 +101,35 @@ function BarProfile({ values, empty }: { values: Array<{ label: string; value: n
   const max = Math.max(...values.map((v) => Math.abs(v.value)), 0);
   if (!values.length) return <div className="telemetry-empty"><strong>{empty}</strong></div>;
   return <div className="bar-profile">{values.map((v) => <div className="profile-row" key={v.label}><span title={v.label}>{v.label}</span><div><i style={{ width: (max ? Math.max(2, Math.abs(v.value) / max * 100) : 2) + "%" }} /></div><b>{formatNumber(v.value)}</b></div>)}</div>;
+}
+
+function PieChart({ values, empty }: { values: Array<{ label: string; value: number }>; empty: string }) {
+  const total = values.reduce((sum, item) => sum + Math.abs(item.value), 0);
+  if (!values.length || total <= 0) return <div className="pie-empty">{empty}</div>;
+
+  const slices = values.slice().sort((a, b) => b.value - a.value).slice(0, 8);
+  const visibleTotal = slices.reduce((sum, item) => sum + Math.abs(item.value), 0);
+  let offset = 0;
+  const gradient = slices.map((item, index) => {
+    const start = offset;
+    offset += Math.abs(item.value) / visibleTotal * 100;
+    return `var(--pie-${(index % 8) + 1}) ${start}% ${offset}%`;
+  }).join(", ");
+
+  return <div className="pie-chart-wrap">
+    <div className="pie-chart" style={{ background: `conic-gradient(${gradient})` }}>
+      <div className="pie-hole"><strong>{values.length}</strong><span>items</span></div>
+    </div>
+    <div className="pie-legend">{slices.map((item, index) => {
+      const share = Math.abs(item.value) / visibleTotal * 100;
+      return <div className="pie-legend-row" key={item.label}>
+        <i className={`pie-swatch swatch-${(index % 8) + 1}`} />
+        <span title={item.label}>{item.label}</span>
+        <b>{share.toFixed(1)}%</b>
+      </div>;
+    })}</div>
+    {values.length > slices.length && <small className="pie-caption">Showing 8 largest contributors; remaining items omitted for readability.</small>}
+  </div>;
 }
 
 function ResultsState({ title, message, danger = false }: { title: string; message: string; danger?: boolean }) {

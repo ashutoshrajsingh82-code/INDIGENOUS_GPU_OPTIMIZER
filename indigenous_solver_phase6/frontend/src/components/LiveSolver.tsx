@@ -17,7 +17,7 @@ const initialJob: SolveJob = {
   startedAt: null, updatedAt: null, configuration: null,
 };
 
-export function LiveSolver({ model, config, onJobCreated, onSolveComplete }: Props) {
+export function LiveSolver({ model, config, onJobCreated, onSolveComplete, onOpenResults }: Props) {
   const [job, setJob] = useState<SolveJob>(initialJob);
   const [progress, setProgress] = useState(0);
   const [iteration, setIteration] = useState<number | null>(null);
@@ -132,7 +132,7 @@ export function LiveSolver({ model, config, onJobCreated, onSolveComplete }: Pro
         <div className="live-toolbar-actions">
           <span className={terminal ? "live-state complete" : "live-state"}><span className="status-dot" /> {terminal ? "SOLVE COMPLETE" : statusLabel}</span>
           <span className="live-refresh">1s telemetry</span>
-          {result && <button onClick={() => document.dispatchEvent(new CustomEvent("solver-nav-results"))}>Results ↗</button>}
+          {result && <button onClick={onOpenResults}>Results ↗</button>}
         </div>
       </div>
 
@@ -201,16 +201,16 @@ export function LiveSolver({ model, config, onJobCreated, onSolveComplete }: Pro
       </div>
 
       <div className="live-chart-grid">
-        <TelemetryChart title="SOLVE PROGRESS" value={Math.round(progress) + "%"} subtitle="Authoritative job progress" mode={progress} />
-        <TelemetryChart title="OBJECTIVE" value={objective === null ? "N/A" : formatNumber(objective)} subtitle="Final solver objective" mode={result ? 100 : 0} />
-        <TelemetryChart title="NUMERICAL RESIDUAL" value={result?.certificate.primalResidual === undefined ? "N/A" : result.certificate.primalResidual.toExponential(2)} subtitle="Primal certificate residual" mode={result ? Math.max(0, Math.min(100, 100 - Math.min(100, Math.abs(result.certificate.primalResidual ?? 0) * 1e12))) : 0} />
-        <TelemetryChart title="WORKSPACE REUSE" value={runtime ? runtime.workspaceReuses.toLocaleString() : "N/A"} subtitle="Persistent workspace telemetry" mode={runtime ? Math.min(100, runtime.workspaceReuses) : 0} />
+        <TelemetryChart title="SOLVE PROGRESS" value={Math.round(progress) + "%"} subtitle="Authoritative job progress" mode={progress} terminal={terminal} />
+        <TelemetryChart title="OBJECTIVE" value={objective === null ? "N/A" : formatNumber(objective)} subtitle="Final solver objective" mode={result ? 100 : 0} terminal={terminal} />
+        <TelemetryChart title="NUMERICAL RESIDUAL" value={result?.certificate.primalResidual === undefined ? "N/A" : result.certificate.primalResidual.toExponential(2)} subtitle="Primal certificate residual" mode={result ? Math.max(0, Math.min(100, 100 - Math.min(100, Math.abs(result.certificate.primalResidual ?? 0) * 1e12))) : 0} terminal={terminal} />
+        <TelemetryChart title="WORKSPACE REUSE" value={runtime ? runtime.workspaceReuses.toLocaleString() : "N/A"} subtitle="Persistent workspace telemetry" mode={runtime ? Math.min(100, runtime.workspaceReuses) : 0} terminal={terminal} />
       </div>
 
       <div className="live-footer-state">
         <div><span className="eyebrow">POST-SOLVE OBSERVABILITY</span><strong>{successful ? "Solution available · verification state is authoritative" : terminal ? "Terminal solver state" : "Live execution telemetry"}</strong><p>{runtime?.message ?? "Telemetry is sourced from the native C++ API. GPU hardware metrics are shown only when the backend reports them."}</p></div>
         <div className="live-footer-actions">
-          {result && <button onClick={() => document.dispatchEvent(new CustomEvent("solver-nav-results"))}>OPEN RESULTS</button>}
+          {result && <button onClick={onOpenResults}>OPEN RESULTS</button>}
           <span className="live-badge">{runtime?.gpuRuntimeActive ? "CUDA ACTIVE" : "CPU EXECUTION"}</span>
           <span className="live-badge">{result?.certificate.passed ? "CERTIFICATE PASS" : result ? "CERTIFICATE CHECK" : "AWAITING RESULT"}</span>
         </div>
@@ -235,7 +235,7 @@ function LiveStatusRow({ label, value, active }: { label: string; value: string;
   return <div className="live-status-row"><span>{label}</span><strong className={active ? "good" : "muted"}><i className={active ? "status-dot" : "status-dot muted"} />{value}</strong></div>;
 }
 
-function TelemetryChart({ title, value, subtitle, mode }: { title: string; value: string; subtitle: string; mode: number }) {
+function TelemetryChart({ title, value, subtitle, mode, terminal }: { title: string; value: string; subtitle: string; mode: number; terminal: boolean }) {
   const height = 92;
   const points = [12, 20, 17, 26, 23, 34, 31, 45, 43, 58, 54, 68, 64, 76, 73, Math.max(8, Math.min(92, mode))];
   const polyline = points.map((p, i) => (i * 100 / (points.length - 1)).toFixed(1) + "," + (height - p)).join(" ");

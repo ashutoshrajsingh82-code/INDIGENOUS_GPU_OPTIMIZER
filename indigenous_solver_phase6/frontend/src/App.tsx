@@ -219,17 +219,8 @@ function Placeholder({ label }: { label: string }) {
 export default App;
 
 function ModelsView({ model, onModelReady }: { model: UploadedModel | null; onModelReady: (model: UploadedModel | null) => void }) {
-  return <section className="dashboard">
-    <div className="hero"><div><span className="eyebrow">PHASE 6.3 · MODEL INGESTION</span><h2>Model workspace</h2><p>Upload an LP or MPS model and validate it before the solver API receives it.</p></div><div className="hero-badge"><span className="status-dot" /> Parser boundary ready</div></div>
-    <div className="content-grid"><article className="panel"><div className="panel-heading"><div><span className="eyebrow">MODEL INPUT</span><h3>Select optimization model</h3></div></div><ModelUpload onModelReady={onModelReady} /></article>
-    <article className="panel"><div className="panel-heading"><div><span className="eyebrow">MODEL SUMMARY</span><h3>{model ? model.summary.name : "No model selected"}</h3></div>{model && <span className="badge">{model.summary.format}</span>}</div>
-    {model ? <><StatusRow label="Upload status" value={model.summary.status.toUpperCase()} ok={model.summary.status === "Ready"} /><StatusRow label="File size" value={formatBytes(model.summary.sizeBytes)} /><StatusRow label="Rows / columns" value={model.summary.rows + " / " + model.summary.columns} /><StatusRow label="Nonzeros" value={String(model.summary.nonzeros)} /><p className="model-message">{model.summary.message}</p></> : <p className="empty-state">Upload a valid .lp or .mps file to populate the model summary.</p>}
-    </article></div>
-    {model && <article className="panel activity"><div className="panel-heading"><div><span className="eyebrow">NEXT STEP</span><h3>Model accepted</h3></div></div><p className="model-message">The browser has validated the file type and size. Exact rows, columns, and nonzero counts will come from the C++ solver API in Phase 6.5.</p></article>}
-  </section>;
+  return <ModelUpload onModelReady={onModelReady} />;
 }
-
-function formatBytes(bytes: number) { if (bytes < 1024) return bytes + " B"; if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"; return (bytes / (1024 * 1024)).toFixed(1) + " MB"; }
 
 function SolveConfigurationView({ config, onChange }: { config: SolverConfiguration; onChange: (config: SolverConfiguration) => void }) {
   const [saved, setSaved] = useState(false);

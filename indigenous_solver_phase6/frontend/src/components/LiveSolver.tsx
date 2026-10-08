@@ -43,11 +43,11 @@ export function LiveSolver({ model, config, onJobCreated }: Props) {
   };
 
   const start = async () => {
-    if (!model) return;
+    if (!model?.modelId) { setError("The solver API did not return a model ID. Re-inspect the model before solving."); return; }
     setError(""); setProgress(0); setIteration(null); setObjective(null); setElapsed(null);
     setJob({ jobId: null, modelId: null, status: "submitting", message: "Submitting model to solver API…", startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), configuration: config });
     try {
-      const response = await solveModel({ modelId: (model as UploadedModel & { modelId?: string }).modelId ?? "", configuration: config });
+      const response = await solveModel({ modelId: model.modelId ?? "", configuration: config });
       setJob({ jobId: response.jobId, modelId: response.modelId ?? null, status: response.status, message: response.message, startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), configuration: config });
       onJobCreated?.(response.jobId);
       if (response.status === "queued" || response.status === "running") poll(response.jobId);

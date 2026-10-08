@@ -10,6 +10,7 @@ import { GpuMonitor } from "./components/GpuMonitor";
 import { BenchmarkDashboard } from "./components/BenchmarkDashboard";
 import { VerificationDashboard } from "./components/VerificationDashboard";
 import { ArchitectureVisualization } from "./components/ArchitectureVisualization";
+import { ReportsDashboard } from "./components/ReportsDashboard";
 import { navigation, runtimeStatus, type SolverNavigationItem } from "./types/solver";
 import "./styles.css";
 
@@ -46,7 +47,7 @@ function App() {
           <div className="runtime-pill"><span className="status-dot" /> {runtimeStatus.backend} · CPU FALLBACK</div>
         </header>
 
-        {active === "dashboard" ? <Dashboard onNavigate={setActive} /> : active === "models" ? <ModelsView model={uploadedModel} onModelReady={setUploadedModel} /> : active === "solve" ? <SolveConfigurationView config={solverConfiguration} onChange={setSolverConfiguration} /> : active === "live" ? <LiveSolver model={uploadedModel} config={solverConfiguration} onJobCreated={setLastJobId} /> : active === "results" ? <ResultsExplorer jobId={lastJobId} /> : active === "gpu" ? <GpuMonitor /> : active === "benchmarks" ? <BenchmarkDashboard /> : active === "verification" ? <VerificationDashboard /> : active === "architecture" ? <ArchitectureVisualization /> : <Placeholder label={activeItem.label} />}
+        {active === "dashboard" ? <Dashboard onNavigate={setActive} /> : active === "models" ? <ModelsView model={uploadedModel} onModelReady={setUploadedModel} /> : active === "solve" ? <SolveConfigurationView config={solverConfiguration} onChange={setSolverConfiguration} /> : active === "live" ? <LiveSolver model={uploadedModel} config={solverConfiguration} onJobCreated={setLastJobId} /> : active === "results" ? <ResultsExplorer jobId={lastJobId} /> : active === "gpu" ? <GpuMonitor /> : active === "benchmarks" ? <BenchmarkDashboard /> : active === "verification" ? <VerificationDashboard /> : active === "architecture" ? <ArchitectureVisualization /> : active === "reports" ? <ReportsDashboard jobId={lastJobId} /> : <Placeholder label={activeItem.label} />}
 
         <footer className="footer">Indigenous GPU Optimizer · React/Vite foundation · Solver logic remains authoritative in C++</footer>
       </main>

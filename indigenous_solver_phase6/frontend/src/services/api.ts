@@ -1,6 +1,7 @@
 import type { SolverConfiguration } from "../types/solverConfig";
 import type { ModelSummary } from "../types/model";
 import type { RuntimeSnapshot } from "../types/runtime";
+import type { VerificationSnapshot } from "../types/verification";
 
 export interface ApiConfig { baseUrl: string; timeoutMs: number; }
 export const apiConfig: ApiConfig = {
@@ -109,4 +110,8 @@ export function getRuntimeSnapshot(): Promise<RuntimeSnapshot> {
 import type { BenchmarkSnapshot } from "../types/benchmark";
 export function getBenchmarkSnapshot(): Promise<BenchmarkSnapshot> {
   return request<BenchmarkSnapshot>("/benchmarks");
+}
+
+export function getVerificationSnapshot(): Promise<VerificationSnapshot> {
+  return request<VerificationSnapshot>("/verification");
 }
